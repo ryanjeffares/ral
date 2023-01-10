@@ -1,0 +1,33 @@
+instruments {
+    Sine {
+        frequency: Float;
+
+        init(freq: Float) {
+            print("Frequency: ");
+            println(freq);
+            frequency = freq;
+        }
+
+        perf(amps: Float) {
+            print("Frequency: ");
+            println(frequency);
+
+            print("Amps: ");
+            println(amps);
+
+            local sig = noise(1.0);
+        }
+    }
+
+    Dummy {
+        init() {
+            println("Dummy");
+        }
+    }
+}
+
+score {
+    Dummy(0.0 0.1);
+    
+    Sine(0.0 0.25 init(440.0) perf(1.0));
+}
