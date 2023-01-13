@@ -15,7 +15,8 @@ instruments {
             print("Amps: ");
             println(amps);
 
-            local sig = noise(1.0);
+            local name: String = "Hello";
+            println(name);
         }
     }
 

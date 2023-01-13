@@ -120,9 +120,9 @@ impl VM {
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        let stream = audio::stream::Stream::new(&self)?;
-        stream.play()?;
-        std::thread::sleep(std::time::Duration::from_millis(3000));
+        // let stream = audio::stream::Stream::new(&self)?;
+        // stream.play()?;
+        // std::thread::sleep(std::time::Duration::from_millis(3000));
         Ok(())
     }
 

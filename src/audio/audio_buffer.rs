@@ -1,5 +1,6 @@
 use crate::utils::number_array::NumberArray;
 
+#[derive(Clone)]
 pub struct AudioBuffer {
     channels: usize,
     buffer_size: usize,
@@ -23,6 +24,12 @@ impl AudioBuffer {
         self.buffer_size
     }
 
+    pub fn clear(&mut self) {
+        for channel in self.data.iter_mut() {
+            channel.fill(0.0);
+        }
+    }
+
     pub fn get_sample(&self, channel: usize, sample: usize) -> f32 {
         self.data[channel][sample]
     }
@@ -41,16 +48,6 @@ impl AudioBuffer {
             for sample in 0..self.buffer_size {
                 self.data[channel][sample] += source.get_sample(channel, sample);
             }
-        }
-    }
-}
-
-impl Clone for AudioBuffer {
-    fn clone(&self) -> Self {
-        AudioBuffer {
-            channels: self.channels,
-            buffer_size: self.buffer_size,
-            data: self.data.clone(),
         }
     }
 }

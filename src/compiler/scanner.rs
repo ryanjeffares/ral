@@ -1,6 +1,8 @@
 use phf::phf_map;
 use std::fmt;
 
+use crate::runtime::instrument::VariableType;
+
 static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
     "instruments" => TokenType::InstrumentsIdent,
     "score" => TokenType::ScoreIdent,
@@ -122,6 +124,16 @@ impl TokenType {
             || *self == TokenType::IntIdent
             || *self == TokenType::AudioIdent
             || *self == TokenType::StringIdent
+    }
+
+    pub fn to_variable_type(&self) -> VariableType {
+        match *self {
+            TokenType::IntIdent => VariableType::Int,
+            TokenType::FloatIdent => VariableType::Float,
+            TokenType::StringIdent => VariableType::String,
+            TokenType::AudioIdent => VariableType::Audio,
+            _ => panic!("Cannot convert {self:?} to VariableType"),
+        }
     }
 
     pub fn is_literal(&self) -> bool {

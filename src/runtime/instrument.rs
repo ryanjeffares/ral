@@ -10,6 +10,7 @@ struct Function {
     ops: Vec<Op>,
     constants: Vec<Value>,
     args: Vec<InstrumentVariable>,
+    locals: Vec<InstrumentVariable>,
 }
 
 #[derive(Clone)]
@@ -43,6 +44,7 @@ pub enum VariableType {
     Audio,
     Float,
     Int,
+    None,
     String,
 }
 
@@ -52,6 +54,7 @@ impl Function {
             ops: Vec::<Op>::new(),
             constants: Vec::<Value>::new(),
             args: Vec::<InstrumentVariable>::new(),
+            locals: Vec::<InstrumentVariable>::new(),
         }
     }
 }
@@ -124,6 +127,22 @@ impl Instrument {
         ));
     }
 
+    pub fn add_init_local(&mut self, variable_name: String, variable_type: VariableType) {
+        self.init_func.locals.push(InstrumentVariable::new(
+            self.init_func.locals.len(),
+            variable_name,
+            variable_type,
+        ));
+    }
+
+    pub fn add_perf_local(&mut self, variable_name: String, variable_type: VariableType) {
+        self.perf_func.locals.push(InstrumentVariable::new(
+            self.perf_func.locals.len(),
+            variable_name,
+            variable_type,
+        ));
+    }
+
     pub fn add_init_arg(
         &mut self,
         variable_index: usize,
@@ -152,6 +171,32 @@ impl Instrument {
 
     pub fn has_variable(&self, variable_name: &String) -> Option<usize> {
         self.variables
+            .iter()
+            .position(|variable| &variable.variable_name == variable_name)
+    }
+
+    pub fn member_type(&self, index: usize) -> VariableType {
+        self.variables[index].variable_type
+    }
+
+    pub fn init_local_type(&self, index: usize) -> VariableType {
+        self.init_func.locals[index].variable_type
+    }
+
+    pub fn perf_local_type(&self, index: usize) -> VariableType {
+        self.perf_func.locals[index].variable_type
+    }
+
+    pub fn has_local_init_variable(&self, variable_name: &String) -> Option<usize> {
+        self.init_func
+            .locals
+            .iter()
+            .position(|variable| &variable.variable_name == variable_name)
+    }
+
+    pub fn has_local_perf_variable(&self, variable_name: &String) -> Option<usize> {
+        self.perf_func
+            .locals
             .iter()
             .position(|variable| &variable.variable_name == variable_name)
     }
@@ -211,6 +256,7 @@ impl InstrumentEventInstance {
             VariableType::Float => Value::float(0.0),
             VariableType::Int => Value::int(0),
             VariableType::String => Value::string(String::new()),
+            _ => unreachable!(),
         })
         .collect()
     }

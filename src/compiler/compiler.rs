@@ -293,14 +293,7 @@ impl Compiler {
                                         let expected_type = self
                                             .vm
                                             .instrument_init_arg_type(instrument_name, arg_count);
-                                        if expected_type
-                                            != match next.token_type() {
-                                                TokenType::Integer => VariableType::Int,
-                                                TokenType::Float => VariableType::Float,
-                                                TokenType::String => VariableType::String,
-                                                _ => unreachable!(),
-                                            }
-                                        {
+                                        if expected_type != next.token_type().to_variable_type() {
                                             self.error(&next, format!("Instrument '{instrument_name}' expected {expected_type:?} for init arg at position {arg_count} but got {:?}", next.token_type()));
                                             return;
                                         }
@@ -654,12 +647,86 @@ impl Compiler {
 
     fn declaration(&mut self, token: &Token, instrument: &mut Instrument) {
         match token.token_type() {
-            TokenType::Local => self.local_declaration(token, instrument),
+            TokenType::Local => self.local_declaration(instrument),
             _ => self.statement(token, instrument),
         }
     }
 
-    fn local_declaration(&mut self, token: &Token, instrument: &mut Instrument) {}
+    fn check_duplicate_var_name(
+        &self,
+        instrument: &Instrument,
+        variable_name: &String,
+    ) -> Option<usize> {
+        match self.context_stack.last().unwrap() {
+            CompilerContext::InitFunc => instrument.has_local_init_variable(variable_name),
+            CompilerContext::PerfFunc => instrument.has_local_perf_variable(variable_name),
+            _ => unreachable!(),
+        }
+    }
+
+    fn add_local(
+        &mut self,
+        instrument: &mut Instrument,
+        variable_name: String,
+        variable_type: VariableType,
+    ) {
+        match self.context_stack.last().unwrap() {
+            CompilerContext::InitFunc => instrument.add_init_local(variable_name, variable_type),
+            CompilerContext::PerfFunc => instrument.add_perf_local(variable_name, variable_type),
+            _ => unreachable!(),
+        }
+    }
+
+    fn local_declaration(&mut self, instrument: &mut Instrument) {
+        if let Some(next) = self.advance() {
+            if next.token_type() != TokenType::Identifier {
+                self.error(&next, "Expected local name".to_string());
+                return;
+            }
+
+            let variable_name = next.text().to_owned();
+            if self
+                .check_duplicate_var_name(instrument, &variable_name)
+                .is_some()
+            {
+                self.error(&next, "Duplicate local variable name".to_string());
+                return;
+            }
+
+            self.consume(TokenType::Colon, "Expected ':' after local name");
+
+            if let Some(next) = self.advance() {
+                if !next.token_type().is_type_ident() {
+                    self.error(&next, "Expected type identifier".to_string());
+                    return;
+                }
+
+                self.add_local(
+                    instrument,
+                    variable_name,
+                    next.token_type().to_variable_type(),
+                );
+
+                self.consume(TokenType::Equal, "Expected '='");
+
+                if let Some(next) = self.advance() {                    
+                    let (next, variable_type) = self.expression(false, &next, instrument);
+                    if let Some(next) = next {
+                        if next.token_type() != TokenType::Semicolon {
+                            self.error(&next, "Expected ';'".to_string());
+                            return;
+                        }
+                    }
+                } else {
+                    self.error_missing_token();
+                }
+            } else {
+                self.error_missing_token();
+            }
+        } else {
+            self.error_missing_token();
+        }
+    }
 
     fn statement(&mut self, token: &Token, instrument: &mut Instrument) {
         match token.token_type() {
@@ -688,10 +755,13 @@ impl Compiler {
                             Op::PrintEmpty
                         },
                     );
-                } else if let Some(next) = self.expression(false, &next, instrument) {
-                    if next.token_type() != TokenType::ParenClose {
-                        self.error(&next, "Expected ')'".to_string());
-                        return;
+                } else {
+                    let (next, _) = self.expression(false, &next, instrument);
+                    if let Some(next) = next {                        
+                        if next.token_type() != TokenType::ParenClose {
+                            self.error(&next, "Expected ')'".to_string());
+                            return;
+                        }
                     }
 
                     self.emit_op(instrument, if print_line { Op::PrintLn } else { Op::Print });
@@ -713,8 +783,9 @@ impl Compiler {
                 "Expected identifier or keyword at start of expression".to_string(),
             );
             self.advance(); // consume illegal token
-        } else if let Some(next) = self.expression(true, token, instrument) {
-            if next.token_type() != TokenType::Semicolon {
+        } else {
+            let (next, _) = self.expression(true, token, instrument);
+            if let Some(next) = next {
                 self.error(&next, "Expected ';' after expression statement".to_string());
             }
         }
@@ -725,16 +796,17 @@ impl Compiler {
         can_assign: bool,
         token: &Token,
         instrument: &mut Instrument,
-    ) -> Option<Token> {
+    ) -> (Option<Token>, VariableType) {
         if token.token_type() == TokenType::Identifier {
-            if let Some(current) = self.primary(token, instrument) {
+            let (current, expr_type) = self.primary(token, instrument);
+            if let Some(current) = current {
                 if current.token_type() == TokenType::Equal {
                     if !can_assign {
                         self.error(
                             &current,
                             "Assignment is not valid in this context".to_string(),
                         );
-                        return None;
+                        return (None, VariableType::None);
                     }
 
                     if let Some(next) = self.advance() {
@@ -747,7 +819,7 @@ impl Compiler {
                                 instrument.emit_init_op(Op::AssignMember);
                             } else if instrument.has_init_arg(token.text()).is_some() {
                                 self.error(token, "Cannot reassign to init arg".to_string());
-                                return None;
+                                return (None, VariableType::None);
                             } else {
                                 self.error(
                                     token,
@@ -756,7 +828,7 @@ impl Compiler {
                                         token.text()
                                     ),
                                 );
-                                return None;
+                                return (None, VariableType::None);
                             }
                         } else if context == CompilerContext::PerfFunc {
                             if let Some(index) = instrument.has_variable(token.text()) {
@@ -764,7 +836,7 @@ impl Compiler {
                                 instrument.emit_perf_op(Op::AssignMember);
                             } else if instrument.has_perf_arg(token.text()).is_some() {
                                 self.error(token, "Cannot reassign to perf arg".to_string());
-                                return None;
+                                return (None, VariableType::None);
                             } else {
                                 self.error(
                                     token,
@@ -773,23 +845,23 @@ impl Compiler {
                                         token.text()
                                     ),
                                 );
-                                return None;
+                                return (None, VariableType::None);
                             }
                         } else {
                             unreachable!();
                         }
 
-                        return next;
+                        next
                     } else {
                         self.error_missing_token();
-                        return None;
+                        (None, VariableType::None)
                     }
+                } else {
+                    self.identifier(token, instrument)
                 }
-
-                Some(current)
             } else {
                 self.error_missing_token();
-                None
+                (None, VariableType::None)
             }
         } else {
             // TODO: full recursive descent
@@ -797,7 +869,7 @@ impl Compiler {
         }
     }
 
-    fn primary(&mut self, token: &Token, instrument: &mut Instrument) -> Option<Token> {
+    fn primary(&mut self, token: &Token, instrument: &mut Instrument) -> (Option<Token>, VariableType) {
         match token.token_type() {
             TokenType::Identifier => self.identifier(token, instrument),
             TokenType::String => self.string(token, instrument),
@@ -805,7 +877,7 @@ impl Compiler {
         }
     }
 
-    fn identifier(&mut self, token: &Token, instrument: &mut Instrument) -> Option<Token> {
+    fn identifier(&mut self, token: &Token, instrument: &mut Instrument) -> (Option<Token>, VariableType) {
         if let Some(next) = self.advance() {
             if next.token_type() != TokenType::Equal {
                 let context = *self.context_stack.last().unwrap();
@@ -813,37 +885,43 @@ impl Compiler {
                     if let Some(index) = instrument.has_variable(token.text()) {
                         instrument.emit_init_constant(Value::int(index as i64));
                         instrument.emit_init_op(Op::LoadMember);
+                        (Some(next), instrument.member_type(index))
                     } else if let Some(index) = instrument.has_init_arg(token.text()) {
                         instrument.emit_init_constant(Value::int(index as i64));
                         instrument.emit_init_op(Op::LoadArg);
+                        (Some(next), instrument.init_arg_type(index))
                     } else {
                         self.error(
                             token,
                             format!("Couldn't find variable '{}' in this scope", token.text()),
                         );
+                        (None, VariableType::None)
                     }
                 } else if context == CompilerContext::PerfFunc {
                     if let Some(index) = instrument.has_variable(token.text()) {
                         instrument.emit_perf_constant(Value::int(index as i64));
                         instrument.emit_perf_op(Op::LoadMember);
+                        (Some(next), instrument.member_type(index))
                     } else if let Some(index) = instrument.has_perf_arg(token.text()) {
                         instrument.emit_perf_constant(Value::int(index as i64));
                         instrument.emit_perf_op(Op::LoadArg);
+                        (Some(next), instrument.perf_arg_type(index))
                     } else {
                         self.error(
                             token,
                             format!("Couldn't find variable '{}' in this scope", token.text()),
                         );
+                        (None, VariableType::None)
                     }
                 } else {
                     unreachable!();
                 }
+            } else {
+                (Some(next), VariableType::None)
             }
-
-            Some(next)
         } else {
             self.error_missing_token();
-            None
+            (None, VariableType::None)
         }
     }
 
@@ -859,13 +937,13 @@ impl Compiler {
         }
     }
 
-    fn string(&mut self, token: &Token, instrument: &mut Instrument) -> Option<Token> {
-        if let Some(res) = self.parse_string(token) {            
+    fn string(&mut self, token: &Token, instrument: &mut Instrument) -> (Option<Token>, VariableType) {
+        if let Some(res) = self.parse_string(token) {
             self.emit_constant(instrument, Value::string(res));
             self.emit_op(instrument, Op::LoadConstant);
-            self.advance()
+            (self.advance(), VariableType::String)
         } else {
-            None
+            (None, VariableType::String)
         }
     }
 
