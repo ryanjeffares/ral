@@ -25,7 +25,8 @@ pub struct Instrument {
 pub struct InstrumentEventInstance {
     instrument_name: String,
     variables: Vec<Value>,
-    init_func: Function,
+    init_func: Function,    
+    init_args: Vec<Value>,
     perf_func: Function,
     perf_args: Vec<Value>,
     duration_samples: usize,
@@ -72,12 +73,14 @@ impl Instrument {
     pub fn create_event_instance(
         &self,
         duration_samples: usize,
+        init_args: Vec<Value>,
         perf_args: Vec<Value>,
     ) -> InstrumentEventInstance {
         InstrumentEventInstance {
             instrument_name: self.instrument_name.clone(),
             variables: vec![Value::default(); self.variables.len()],
             init_func: self.init_func.clone(),
+            init_args,
             perf_func: self.perf_func.clone(),
             perf_args,
             duration_samples,
@@ -127,12 +130,20 @@ impl Instrument {
         ));
     }
 
-    pub fn add_init_local(&mut self, variable_name: String, variable_type: VariableType) {
-        self.init_func.locals.push(InstrumentVariable::new(
-            self.init_func.locals.len(),
-            variable_name,
-            variable_type,
-        ));
+    pub fn add_init_local(&mut self, variable_name: String, variable_type: VariableType) -> bool {
+        if self.get_init_arg(&variable_name).is_some()
+            || self.get_variable(&variable_name).is_some()
+            || self.get_local_init_variable(&variable_name).is_some()
+        {
+            false
+        } else {
+            self.init_func.locals.push(InstrumentVariable::new(
+                self.init_func.locals.len(),
+                variable_name,
+                variable_type,
+            ));
+            true
+        }
     }
 
     pub fn add_perf_local(&mut self, variable_name: String, variable_type: VariableType) {
@@ -145,31 +156,41 @@ impl Instrument {
 
     pub fn add_init_arg(
         &mut self,
-        variable_index: usize,
-        variable_name: String,
-        variable_type: VariableType,
-    ) {
-        self.init_func.args.push(InstrumentVariable::new(
-            variable_index,
-            variable_name,
-            variable_type,
-        ));
+        arg_index: usize,
+        arg_name: String,
+        arg_type: VariableType,
+    ) -> bool {
+        if self.get_init_arg(&arg_name).is_some() {
+            false
+        } else if self.get_variable(&arg_name).is_some() {
+            false
+        } else {
+            self.init_func
+                .args
+                .push(InstrumentVariable::new(arg_index, arg_name, arg_type));
+            true
+        }
     }
 
     pub fn add_perf_arg(
         &mut self,
-        variable_index: usize,
-        variable_name: String,
-        variable_type: VariableType,
-    ) {
-        self.perf_func.args.push(InstrumentVariable::new(
-            variable_index,
-            variable_name,
-            variable_type,
-        ));
+        arg_index: usize,
+        arg_name: String,
+        arg_type: VariableType,
+    ) -> bool {
+        if self.get_perf_arg(&arg_name).is_some() {
+            false
+        } else if self.get_variable(&arg_name).is_some() {
+            false
+        } else {
+            self.perf_func
+                .args
+                .push(InstrumentVariable::new(arg_index, arg_name, arg_type));
+            true
+        }
     }
 
-    pub fn has_variable(&self, variable_name: &String) -> Option<usize> {
+    pub fn get_variable(&self, variable_name: &String) -> Option<usize> {
         self.variables
             .iter()
             .position(|variable| &variable.variable_name == variable_name)
@@ -187,28 +208,28 @@ impl Instrument {
         self.perf_func.locals[index].variable_type
     }
 
-    pub fn has_local_init_variable(&self, variable_name: &String) -> Option<usize> {
+    pub fn get_local_init_variable(&self, variable_name: &String) -> Option<usize> {
         self.init_func
             .locals
             .iter()
             .position(|variable| &variable.variable_name == variable_name)
     }
 
-    pub fn has_local_perf_variable(&self, variable_name: &String) -> Option<usize> {
+    pub fn get_local_perf_variable(&self, variable_name: &String) -> Option<usize> {
         self.perf_func
             .locals
             .iter()
             .position(|variable| &variable.variable_name == variable_name)
     }
 
-    pub fn has_init_arg(&self, arg_name: &String) -> Option<usize> {
+    pub fn get_init_arg(&self, arg_name: &String) -> Option<usize> {
         self.init_func
             .args
             .iter()
             .position(|arg| &arg.variable_name == arg_name)
     }
 
-    pub fn has_perf_arg(&self, arg_name: &String) -> Option<usize> {
+    pub fn get_perf_arg(&self, arg_name: &String) -> Option<usize> {
         self.perf_func
             .args
             .iter()
@@ -261,80 +282,68 @@ impl InstrumentEventInstance {
         .collect()
     }
 
-    pub fn run_init(&mut self, args: &[Value]) {
+    pub fn run_init(&mut self) {
         println!("INFO: running init for {}", self.instrument_name);
-        let mut stack = Vec::<Value>::new();
-        let mut constant_idx = 0;
-
-        for op in &self.init_func.ops {
-            match op {
-                Op::AssignLocal => todo!(),
-                Op::AssignMember => {
-                    let index = self.init_func.constants[constant_idx].get_int() as usize;
-                    constant_idx += 1;
-                    self.variables[index] = stack.pop().unwrap();
-                }
-                Op::DeclareLocal => todo!(),
-                Op::LoadArg => {
-                    let index = self.init_func.constants[constant_idx].get_int() as usize;
-                    constant_idx += 1;
-                    stack.push(args[index].clone());
-                }
-                Op::LoadConstant => {
-                    stack.push(self.init_func.constants[constant_idx].clone());
-                    constant_idx += 1;
-                }
-                Op::LoadLocal => todo!(),
-                Op::LoadMember => {
-                    let index = self.init_func.constants[constant_idx].get_int() as usize;
-                    constant_idx += 1;
-                    stack.push(self.variables[index].clone());
-                }
-                Op::Print => {
-                    let value = stack.pop().unwrap();
-                    print!("{value}");
-                }
-                Op::PrintEmpty => {
-                    print!("\t");
-                }
-                Op::PrintLn => {
-                    let value = stack.pop().unwrap();
-                    println!("{value}");
-                }
-                Op::PrintLnEmpty => {
-                    println!();
-                }
-            }
-        }
+        self.run_ops(false);
     }
 
     /// Returns true when the event is over
     #[must_use]
     pub fn run_perf(&mut self, buffer_to_fill: &mut AudioBuffer) -> bool {
+        self.run_ops(true);
+        self.sample_counter += buffer_to_fill.buffer_size();
+        self.sample_counter >= self.duration_samples
+    }
+
+    fn run_ops(&mut self, perf: bool) {
+        let func = if perf {
+            &self.perf_func
+        } else {
+            &self.init_func
+        };
+
+        let args = if perf {
+            &self.init_args
+        } else {
+            &self.perf_args
+        };
+
         let mut stack = Vec::<Value>::new();
+        let mut locals = Vec::<Value>::new();
         let mut constant_idx = 0;
 
-        for op in &self.perf_func.ops {
+        for op in &func.ops {
             match op {
-                Op::AssignLocal => todo!(),
+                Op::AssignLocal => {
+                    let index = func.constants[constant_idx].get_int() as usize;
+                    constant_idx += 1;
+                    locals[index] = stack.pop().unwrap();
+                }
                 Op::AssignMember => {
-                    let index = self.perf_func.constants[constant_idx].get_int() as usize;
+                    let index = func.constants[constant_idx].get_int() as usize;
                     constant_idx += 1;
                     self.variables[index] = stack.pop().unwrap();
                 }
-                Op::DeclareLocal => todo!(),
+                Op::DeclareLocal => {
+                    let value = stack.pop().unwrap();
+                    locals.push(value);
+                }
                 Op::LoadArg => {
-                    let index = self.perf_func.constants[constant_idx].get_int() as usize;
+                    let index = func.constants[constant_idx].get_int() as usize;
                     constant_idx += 1;
-                    stack.push(self.perf_args[index].clone());
+                    stack.push(args[index].clone());
                 }
                 Op::LoadConstant => {
-                    stack.push(self.perf_func.constants[constant_idx].clone());
+                    stack.push(func.constants[constant_idx].clone());
                     constant_idx += 1;
                 }
-                Op::LoadLocal => todo!(),
+                Op::LoadLocal => {
+                    let index = func.constants[constant_idx].get_int() as usize;
+                    constant_idx += 1;
+                    stack.push(locals[index].clone());
+                }
                 Op::LoadMember => {
-                    let index = self.perf_func.constants[constant_idx].get_int() as usize;
+                    let index = func.constants[constant_idx].get_int() as usize;
                     constant_idx += 1;
                     stack.push(self.variables[index].clone());
                 }
@@ -354,9 +363,6 @@ impl InstrumentEventInstance {
                 }
             }
         }
-
-        self.sample_counter += buffer_to_fill.buffer_size();
-        self.sample_counter >= self.duration_samples
     }
 }
 

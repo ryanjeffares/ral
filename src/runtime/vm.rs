@@ -120,9 +120,9 @@ impl VM {
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        // let stream = audio::stream::Stream::new(&self)?;
-        // stream.play()?;
-        // std::thread::sleep(std::time::Duration::from_millis(3000));
+        let stream = audio::stream::Stream::new(&self)?;
+        stream.play()?;
+        std::thread::sleep(std::time::Duration::from_millis(3000));
         Ok(())
     }
 
@@ -151,9 +151,10 @@ impl VM {
                     let index = event.instrument_index;
                     let mut instrument = self.instruments[index].create_event_instance(
                         event.duration as usize * self.config().sample_rate().0 as usize,
+                        event.init_args.clone(),
                         event.perf_args.clone(),
                     );
-                    instrument.run_init(&event.init_args);
+                    instrument.run_init();
                     self.active_score_events.push(instrument);
                 }
             }
@@ -175,7 +176,7 @@ impl VM {
         };
 
         let mut noise = Noise::new();
-        buffer_to_fill.add_from(&noise.get_next_audio_block(&stream_info, vec![Value::float(1.0)]));
+        buffer_to_fill.add_from(&noise.get_next_audio_block(&stream_info, vec![Value::float(0.01)]));
 
         buffer_to_fill
     }

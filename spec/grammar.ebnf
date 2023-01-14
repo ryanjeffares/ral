@@ -1,0 +1,39 @@
+(* Top Level *)
+program = instrumentsDeclaration, scoreDeclaration ;
+instrumentsDeclaration = "instruments", "{", [ { instrument } ], "}", ;
+scoreDeclaration = "score", "{", [ { scoreEvent } ] ;
+
+(* Instruments *)
+instrument = IDENTIFIER, "{", [ { memberVarDeclaration } ], [ initFunc ], [ perfFunc ] "}" ;
+memberVarDeclaration = IDENTIFIER, ":", TYPE, ";" ;
+initFunc = "init", [ "(", [ { IDENTIFIER, ":", TYPE - "Audio" } ], ")" ], "{", [ { localDeclaration | statement - outputStatement } ], "}" ;
+perfFunc = "init", [ "(", [ { IDENTIFIER, ":", TYPE - "Audio" } ], ")" ], "{", [ { localDeclaration | statement } ], "}" ;
+
+localDeclaration = "local", IDENTIFIER, ":", TYPE, "=", expression ";" ;
+
+statement = printStatement | printLnStatement | outputStatement | assignmentStatement ;
+
+printStatement = "print", "(", expression, ")", ";" ;
+printLnStatement = "println", "(", expression, ")", ";" ;
+outputStatement = "output", "(", expression, ")", ";" ;
+assignmentStatement = IDENTIFIER "=" expression ";" ;
+
+(* TODO: logical/bitwise/unary expression types *)
+expression = term ;
+term = factor [ { ("-" | "+") factor } ] ;
+factor = call [ { ("/" | "*") call } ] ;
+call = componentCall | primary ;
+componentCall = COMPONENT_NAME "(", [ { expression } ], ")", ";" ;
+primary = INT | FLOAT | STRING | IDENTIFIER | "(", expression, ")" ;
+
+(* Score *)
+scoreEvent = IDENTIFIER, "(", [ { LITERAL } ], ")", ";" ;
+
+(* Lexemes *)
+ALPHA = "a" ... "z" | "A" ... "Z" | "_" ;
+DIGIT = "0" ... "9" ;
+IDENTIFIER = ALPHA, [ { ALPHA | DIGIT } ] ;
+INT = { DIGIT } ;
+FLOAT = { DIGIT }, ".", { DIGIT } ;
+STRING = '"', { any char }, '"' ;
+TYPE = "Int" | "Float" | "String" | "Audio" ;

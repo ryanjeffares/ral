@@ -43,6 +43,7 @@ pub enum TokenType {
     BraceClose,
     Colon,
     Comma,
+    EndOfFile,
     Equal,
     ErrorToken,
     Float,
@@ -180,35 +181,42 @@ impl Scanner {
         slice.to_string()
     }
 
-    pub fn scan_token(&mut self) -> Option<Token> {
-        if self.peek().is_none() {
-            None
-        } else {
-            self.skip_whitespace();
-            self.start = self.current;
+    pub fn scan_token(&mut self) -> Token {
+        self.skip_whitespace();
+        self.start = self.current;
 
-            let current = self.advance()?;
+        if let Some(current) = self.advance() {
             if current.is_alphabetic() || current == '_' {
-                return Some(self.identifier());
+                return self.identifier();
             }
 
             if current.is_ascii_digit() {
-                return Some(self.number());
+                return self.number();
             }
 
             if let Some(token_type) = SYMBOLS.get(&self.code[self.start..self.current]) {
-                Some(self.make_token(*token_type))
+                self.make_token(*token_type)
             } else if current == '"' {
-                Some(self.string())
+                self.string()
             } else {
-                Some(Token {
+                Token {
                     text: String::default(),
                     start: 0,
                     end: 0,
                     token_type: TokenType::ErrorToken,
                     line: 0,
                     column: 0,
-                })
+                }
+            }
+        } else {
+            // end of file
+            Token {
+                text: String::default(),
+                start: 0,
+                end: 0,
+                line: self.line,
+                column: self.column,
+                token_type: TokenType::EndOfFile,
             }
         }
     }
@@ -257,6 +265,19 @@ impl Scanner {
                     self.line += 1;
                     self.column = 0;
                     self.advance();
+                }
+                '/' => {
+                    if self.peek_next().is_some() && self.peek_next().unwrap() == '/' {
+                        loop {
+                            if self.peek().is_some() && self.peek().unwrap() != '\n' {
+                                self.advance();
+                            } else {
+                                break;
+                            }
+                        }
+                    } else {
+                        break;
+                    }
                 }
                 _ => break,
             }
