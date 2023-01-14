@@ -1,11 +1,32 @@
 use cpal::SupportedStreamConfig;
+use phf::phf_map;
 
 use crate::{
-    audio::{self, audio_buffer::AudioBuffer, components::generators::{noise::Noise, generator::{Generator, StreamInfo}}},
-    runtime::instrument::{Instrument, VariableType, InstrumentEventInstance},
+    audio::{
+        self,
+        audio_buffer::AudioBuffer,
+        components::{
+            component::{Component, StreamInfo},
+            generators::{generator::Generator, noise::Noise, sine::Sine},
+        },
+    },
+    runtime::instrument::{Instrument, InstrumentEventInstance, VariableType},
     runtime::value::Value,
 };
 use std::{collections::HashMap, error::Error};
+
+static COMPONENTS: phf::Map<&'static str, ComponentInfo> = phf_map! {
+    "Noise" => ComponentInfo {
+        factory: || Box::new(Noise::new()),
+        input_types: &Noise::INPUT_TYPES,
+        output_type: Noise::OUTPUT_TYPE,
+    },
+    "Sine" => ComponentInfo {
+        factory: || Box::new(Sine::new()),
+        input_types: &Sine::INPUT_TYPES,
+        output_type: Sine::OUTPUT_TYPE,
+    }
+};
 
 #[derive(Clone)]
 pub struct VM {
@@ -17,6 +38,8 @@ pub struct VM {
     audio_config: Option<SupportedStreamConfig>,
 }
 
+unsafe impl Send for VM {}
+
 #[derive(Clone, Debug)]
 struct ScoreEvent {
     instrument_index: usize,
@@ -26,7 +49,20 @@ struct ScoreEvent {
     perf_args: Vec<Value>,
 }
 
-unsafe impl Send for VM {}
+#[derive(Clone)]
+pub struct ComponentInfo {
+    pub factory: fn() -> Box<dyn Component>,
+    pub input_types: &'static [VariableType],
+    pub output_type: VariableType,
+}
+
+pub fn has_component(component_name: &String) -> bool {
+    COMPONENTS.contains_key(component_name.as_str())
+}
+
+pub fn component_info(component_name: &String) -> ComponentInfo {
+    COMPONENTS.get(component_name).unwrap().clone()
+}
 
 impl VM {
     pub fn new() -> Self {
@@ -122,15 +158,20 @@ impl VM {
     pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
         let stream = audio::stream::Stream::new(&self)?;
         stream.play()?;
-        std::thread::sleep(std::time::Duration::from_millis(3000));
+        std::thread::sleep(std::time::Duration::from_secs_f32(stream.length_secs()));
         Ok(())
     }
 
-    pub fn sort_score_events(&mut self, sample_rate: cpal::SampleRate) {
+    pub fn sort_score_events(&mut self, sample_rate: cpal::SampleRate) -> f32 {
         let sr = sample_rate.0 as f32;
         println!("Sample Rate: {sr}");
+        let mut last_end_sample = 0.0;
         for event in self.score_events.iter() {
             let sample = (event.start_time * sr) as usize;
+            let end_time = event.start_time + event.duration;
+            if end_time > last_end_sample {
+                last_end_sample = end_time;
+            }
             println!("Adding sorted score event at {sample}: {event:?}");
             if self.sorted_score_events.contains_key(&sample) {
                 self.sorted_score_events
@@ -141,42 +182,43 @@ impl VM {
                 self.sorted_score_events.insert(sample, vec![event.clone()]);
             }
         }
+
+        last_end_sample
     }
 
     pub fn get_next_buffer(&mut self, channels: usize, buffer_size: usize) -> AudioBuffer {
         let mut buffer_to_fill = AudioBuffer::new(channels, buffer_size);
-        for _ in 0..buffer_size {
-            if let Some(events) = self.sorted_score_events.get(&self.sample_counter) {
-                for event in events.iter() {
-                    let index = event.instrument_index;
-                    let mut instrument = self.instruments[index].create_event_instance(
-                        event.duration as usize * self.config().sample_rate().0 as usize,
-                        event.init_args.clone(),
-                        event.perf_args.clone(),
-                    );
-                    instrument.run_init();
-                    self.active_score_events.push(instrument);
-                }
-            }
-            self.sample_counter += 1;
-        }
-
-        let mut i = 0;
-        while i < self.active_score_events.len() {
-            if self.active_score_events[i].run_perf(&mut buffer_to_fill) {
-                self.active_score_events.remove(i);
-            }
-            i += 1;
-        }
-
         let stream_info = StreamInfo {
             sample_rate: self.config().sample_rate(),
             buffer_size,
             channels,
         };
 
-        let mut noise = Noise::new();
-        buffer_to_fill.add_from(&noise.get_next_audio_block(&stream_info, vec![Value::float(0.01)]));
+        for _ in 0..buffer_size {
+            if let Some(events) = self.sorted_score_events.get(&self.sample_counter) {
+                for event in events.iter() {
+                    let index = event.instrument_index;
+                    let mut instrument = self.instruments[index].create_event_instance(
+                        (event.duration * self.config().sample_rate().0 as f32) as usize,
+                        event.init_args.clone(),
+                        event.perf_args.clone(),
+                    );
+                    instrument.run_init(&stream_info, &mut buffer_to_fill);
+                    self.active_score_events.push(instrument);
+                }
+            }
+            self.sample_counter += 1;
+        }
+
+        // TODO: instrument execution order
+        let mut i = 0;
+        while i < self.active_score_events.len() {
+            if self.active_score_events[i].run_perf(&stream_info, &mut buffer_to_fill) {
+                self.active_score_events.remove(i);
+            } else {
+                i += 1;
+            }
+        }
 
         buffer_to_fill
     }

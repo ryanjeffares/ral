@@ -2,18 +2,30 @@ instruments {
     Sine {
         frequency: Float;
 
-        init(freq: Float) {
-            frequency = freq;
-            print("Frequency: ");
-            println(frequency);
+        perf(amps: Float, freq: Float) {
+            local sine: Audio = Sine(amps, freq);
+            output(sine);
+        }
+    }
+
+    Noise {
+        amplitude: Float;
+
+        init(amps: Float) {
+            amplitude = amps;
         }
 
-        perf(amps: Float) {
-            println(amps);         
+        perf {
+            output(Noise(amplitude));
         }
     }
 }
 
 score {
-    Sine(0.0 1.0 init(440.0) perf(1.0));
+    Sine(0.0 1.0  perf(0.2 440.0));
+    Sine(1.0 0.5  perf(0.2 220.0));
+    Sine(2.0 0.25 perf(0.2 110.0));
+    Sine(2.5 0.25 perf(0.2  55.0));
+
+    Noise(3.0 1.0 init(0.01));
 }

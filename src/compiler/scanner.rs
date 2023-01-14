@@ -15,6 +15,7 @@ static KEYWORDS: phf::Map<&'static str, TokenType> = phf_map! {
     "print" => TokenType::Print,
     "println" => TokenType::PrintLn,
     "local" => TokenType::Local,
+    "output" => TokenType::Output,
 };
 
 static SYMBOLS: phf::Map<&'static str, TokenType> = phf_map! {
@@ -54,6 +55,7 @@ pub enum TokenType {
     IntIdent,
     Integer,
     Local,
+    Output,
     ParenOpen,
     ParenClose,
     PerfIdent,

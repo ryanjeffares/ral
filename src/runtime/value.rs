@@ -1,6 +1,6 @@
 use std::{fmt, mem::ManuallyDrop};
 
-use crate::utils::number_array::NumberArray;
+use crate::audio::audio_buffer::AudioBuffer;
 
 pub struct Value {
     value_type: ValueType,
@@ -19,7 +19,7 @@ union Data {
     int: i64,
     float: f32,
     string: ManuallyDrop<Box<String>>,
-    audio: ManuallyDrop<Box<NumberArray<f32>>>,
+    audio: ManuallyDrop<Box<AudioBuffer>>,
 }
 
 impl Value {
@@ -46,11 +46,11 @@ impl Value {
         }
     }
 
-    pub fn audio(value: NumberArray<f32>) -> Self {
+    pub fn audio(value: AudioBuffer) -> Self {
         Value {
             value_type: ValueType::Audio,
             value: Data {
-                audio: ManuallyDrop::<Box<NumberArray<f32>>>::new(Box::new(value)),
+                audio: ManuallyDrop::<Box<AudioBuffer>>::new(Box::new(value)),
             },
         }
     }
@@ -65,6 +65,10 @@ impl Value {
 
     pub fn get_float(&self) -> f32 {
         unsafe { self.value.float }
+    }
+
+    pub fn get_audio(&self) -> &AudioBuffer {
+        unsafe { self.value.audio.as_ref() }
     }
 }
 

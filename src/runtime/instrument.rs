@@ -1,8 +1,10 @@
 use std::fmt;
 
 use crate::{
-    audio::audio_buffer::AudioBuffer, runtime::ops::Op, runtime::value::Value,
-    utils::number_array::NumberArray,
+    audio::{audio_buffer::AudioBuffer, components::component::{Component, StreamInfo}},
+    runtime::ops::Op,
+    runtime::value::Value,
+    utils::{number_array::NumberArray, timer::Timer},
 };
 
 #[derive(Clone)]
@@ -11,6 +13,7 @@ struct Function {
     constants: Vec<Value>,
     args: Vec<InstrumentVariable>,
     locals: Vec<InstrumentVariable>,
+    components: Vec<Box<dyn Component>>,
 }
 
 #[derive(Clone)]
@@ -25,7 +28,7 @@ pub struct Instrument {
 pub struct InstrumentEventInstance {
     instrument_name: String,
     variables: Vec<Value>,
-    init_func: Function,    
+    init_func: Function,
     init_args: Vec<Value>,
     perf_func: Function,
     perf_args: Vec<Value>,
@@ -56,6 +59,7 @@ impl Function {
             constants: Vec::<Value>::new(),
             args: Vec::<InstrumentVariable>::new(),
             locals: Vec::<InstrumentVariable>::new(),
+            components: Vec::<Box<dyn Component>>::new(),
         }
     }
 }
@@ -146,12 +150,20 @@ impl Instrument {
         }
     }
 
-    pub fn add_perf_local(&mut self, variable_name: String, variable_type: VariableType) {
-        self.perf_func.locals.push(InstrumentVariable::new(
-            self.perf_func.locals.len(),
-            variable_name,
-            variable_type,
-        ));
+    pub fn add_perf_local(&mut self, variable_name: String, variable_type: VariableType) -> bool {
+        if self.get_perf_arg(&variable_name).is_some()
+            || self.get_variable(&variable_name).is_some()
+            || self.get_local_perf_variable(&variable_name).is_some()
+        {
+            false
+        } else {
+            self.perf_func.locals.push(InstrumentVariable::new(
+                self.perf_func.locals.len(),
+                variable_name,
+                variable_type,
+            ));
+            true
+        }
     }
 
     pub fn add_init_arg(
@@ -236,6 +248,16 @@ impl Instrument {
             .position(|arg| &arg.variable_name == arg_name)
     }
 
+    pub fn add_init_component(&mut self, component: Box<dyn Component>) -> usize {
+        self.init_func.components.push(component);
+        self.init_func.components.len() - 1
+    }
+
+    pub fn add_perf_component(&mut self, component: Box<dyn Component>) -> usize {
+        self.perf_func.components.push(component);
+        self.perf_func.components.len() - 1
+    }
+
     pub fn emit_init_op(&mut self, op: Op) {
         self.init_func.ops.push(op);
     }
@@ -264,48 +286,31 @@ impl fmt::Display for Instrument {
 }
 
 impl InstrumentEventInstance {
-    pub fn create_default_args(&self, perf: bool) -> Vec<Value> {
-        if perf {
-            &self.perf_func
-        } else {
-            &self.init_func
-        }
-        .args
-        .iter()
-        .map(|arg| match arg.variable_type {
-            VariableType::Audio => Value::audio(NumberArray::<f32>::new(32)),
-            VariableType::Float => Value::float(0.0),
-            VariableType::Int => Value::int(0),
-            VariableType::String => Value::string(String::new()),
-            _ => unreachable!(),
-        })
-        .collect()
-    }
-
-    pub fn run_init(&mut self) {
+    pub fn run_init(&mut self, stream_info: &StreamInfo, buffer_to_fill: &mut AudioBuffer) {
         println!("INFO: running init for {}", self.instrument_name);
-        self.run_ops(false);
+        self.run_ops(false, stream_info, buffer_to_fill);        
     }
 
     /// Returns true when the event is over
     #[must_use]
-    pub fn run_perf(&mut self, buffer_to_fill: &mut AudioBuffer) -> bool {
-        self.run_ops(true);
-        self.sample_counter += buffer_to_fill.buffer_size();
+    pub fn run_perf(&mut self, stream_info: &StreamInfo, buffer_to_fill: &mut AudioBuffer) -> bool {
+        // let _timer = Timer::new("Perf func");
+        self.run_ops(true, stream_info, buffer_to_fill);
+        self.sample_counter += stream_info.buffer_size;
         self.sample_counter >= self.duration_samples
     }
 
-    fn run_ops(&mut self, perf: bool) {
+    fn run_ops(&mut self, perf: bool, stream_info: &StreamInfo, buffer_to_fill: &mut AudioBuffer) {
         let func = if perf {
-            &self.perf_func
+            &mut self.perf_func
         } else {
-            &self.init_func
+            &mut self.init_func
         };
 
         let args = if perf {
-            &self.init_args
-        } else {
             &self.perf_args
+        } else {
+            &self.init_args
         };
 
         let mut stack = Vec::<Value>::new();
@@ -323,6 +328,15 @@ impl InstrumentEventInstance {
                     let index = func.constants[constant_idx].get_int() as usize;
                     constant_idx += 1;
                     self.variables[index] = stack.pop().unwrap();
+                }
+                Op::CallComponent => {
+                    let index = func.constants[constant_idx].get_int() as usize;
+                    let arg_count = func.components[index].arg_count();
+                    let mut args = vec![Value::default(); arg_count];
+                    for i in 0..arg_count {
+                        args[arg_count - i - 1] = stack.pop().unwrap();
+                    }
+                    stack.push(Value::audio(func.components[index].get_next_audio_block(stream_info, args)));
                 }
                 Op::DeclareLocal => {
                     let value = stack.pop().unwrap();
@@ -346,6 +360,9 @@ impl InstrumentEventInstance {
                     let index = func.constants[constant_idx].get_int() as usize;
                     constant_idx += 1;
                     stack.push(self.variables[index].clone());
+                }
+                Op::Output => {
+                    buffer_to_fill.add_from(stack.pop().unwrap().get_audio());
                 }
                 Op::Print => {
                     let value = stack.pop().unwrap();

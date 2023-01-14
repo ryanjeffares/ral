@@ -45,6 +45,7 @@ impl Error for StreamError {}
 
 /// A simple wrapper around `cpal::Stream` to take care of binding callbacks so we can always use f32 in the front-end.
 pub struct Stream {
+    length: f32,
     config: StreamConfig,
     stream: cpal::Stream,
 }
@@ -60,9 +61,10 @@ impl Stream {
 
         let mut vm = vm_ref.clone();
         vm.add_config(config.clone());
-        vm.sort_score_events(config.sample_rate());
+        let length = vm.sort_score_events(config.sample_rate());
 
         Ok(Stream {
+            length,
             config: config.config(),
             stream: match config.sample_format() {
                 cpal::SampleFormat::I16 => device.build_output_stream(
@@ -88,6 +90,10 @@ impl Stream {
                 ),
             }?,
         })
+    }
+
+    pub fn length_secs(&self) -> f32 {
+        self.length
     }
 
     pub fn play(&self) -> Result<(), cpal::PlayStreamError> {

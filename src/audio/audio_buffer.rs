@@ -1,6 +1,8 @@
+use std::fmt;
+
 use crate::utils::number_array::NumberArray;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AudioBuffer {
     channels: usize,
     buffer_size: usize,
