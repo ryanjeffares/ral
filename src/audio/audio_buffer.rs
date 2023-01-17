@@ -1,5 +1,3 @@
-use std::fmt;
-
 use crate::utils::number_array::NumberArray;
 
 #[derive(Clone, Debug)]
@@ -18,12 +16,30 @@ impl AudioBuffer {
         }
     }
 
+    pub fn new_with_value(channels: usize, buffer_size: usize, value: f32) -> Self {
+        AudioBuffer {
+            channels,
+            buffer_size,
+            data: vec![NumberArray::<f32>::new_with_value(buffer_size, value); channels],
+        }
+    }
+
     pub fn channels(&self) -> usize {
         self.channels
     }
 
     pub fn buffer_size(&self) -> usize {
         self.buffer_size
+    }
+
+    pub fn max(&self) -> f32 {
+        let mut max = 0f32;
+        for channel in &self.data {
+            for sample in channel {
+                max = max.max(*sample);
+            }
+        }
+        max
     }
 
     pub fn clear(&mut self) {
@@ -49,6 +65,39 @@ impl AudioBuffer {
         for channel in 0..self.channels {
             for sample in 0..self.buffer_size {
                 self.data[channel][sample] += source.get_sample(channel, sample);
+            }
+        }
+    }
+
+    pub fn subtract_from(&mut self, source: &AudioBuffer) {
+        assert!(self.channels == source.channels && self.buffer_size == source.buffer_size);
+        for channel in 0..self.channels {
+            for sample in 0..self.buffer_size {
+                self.data[channel][sample] -= source.get_sample(channel, sample);
+            }
+        }
+    }
+
+    pub fn apply_gain(&mut self, gain: f32) {
+        for channel in 0..self.channels {
+            for sample in 0..self.buffer_size {
+                self.data[channel][sample] *= gain;
+            }
+        }
+    }
+
+    pub fn apply_add(&mut self, add: f32) {
+        for channel in 0..self.channels {
+            for sample in 0..self.buffer_size {
+                self.data[channel][sample] += add;
+            }
+        }
+    }
+
+    pub fn multiply_by(&mut self, other: &AudioBuffer) {
+        for channel in 0..self.channels {
+            for sample in 0..self.buffer_size {
+                self.data[channel][sample] *= other.get_sample(channel, sample);
             }
         }
     }

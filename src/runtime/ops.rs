@@ -1,16 +1,22 @@
-#[derive(Copy, Clone, Debug, PartialEq)]
+use super::value::Value;
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Op {
-    AssignLocal,
-    AssignMember,
-    CallComponent,
+    Add,
+    AssignLocal(usize),
+    AssignMember(usize),
+    CallComponent(usize),
     DeclareLocal,
-    LoadArg,
-    LoadConstant,
-    LoadLocal,
-    LoadMember,
+    Divide,
+    LoadArg(usize),
+    LoadConstant(Value),
+    LoadLocal(usize),
+    LoadMember(usize),
+    Multiply,
     Output,
     Print,
     PrintEmpty,
     PrintLn,
     PrintLnEmpty,
+    Subtract,
 }

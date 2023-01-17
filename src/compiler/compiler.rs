@@ -51,7 +51,11 @@ struct Compiler {
     vm: VM,
 }
 
-pub fn compile_and_run(code: String, file_path: String) -> Result<(), Box<dyn Error>> {
+pub fn compile_and_run(
+    code: String,
+    file_path: String,
+    real_time: bool,
+) -> Result<(), Box<dyn Error>> {
     let mut compiler = Compiler {
         file_path,
         scanner: Scanner::new(code),
@@ -72,7 +76,7 @@ pub fn compile_and_run(code: String, file_path: String) -> Result<(), Box<dyn Er
     } else {
         compiler.print_ops();
         let _timer = Timer::new("Run");
-        compiler.run()?;
+        compiler.run(real_time)?;
     }
 
     Ok(())
@@ -83,39 +87,31 @@ impl Compiler {
         self.context_stack.push(CompilerContext::TopLevel);
         self.advance();
         loop {
-            if self.current.is_some() {
-                if self.match_token(TokenType::InstrumentsIdent) {
-                    self.instruments_block();
-                } else if self.match_token(TokenType::ScoreIdent) {
-                    self.score_block();
-                } else if self.match_token(TokenType::EndOfFile) {
-                    break;
-                } else {
-                    self.error_at_current(
-                        "Invalid token at top level; expected 'instruments' or 'score'".to_string(),
-                    );
-                    break;
-                }
+            if self.match_token(TokenType::InstrumentsIdent) {
+                self.instruments_block();
+            } else if self.match_token(TokenType::ScoreIdent) {
+                self.score_block();
+            } else if self.match_token(TokenType::EndOfFile) {
+                break;
             } else {
-                unreachable!();
+                self.error_at_current(
+                    "Invalid token at top level; expected 'instruments' or 'score'".to_string(),
+                );
+                break;
+            }
+
+            if self.had_error {
+                break;
             }
         }
     }
 
-    fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        self.vm.run()
+    fn run(&mut self, real_time: bool) -> Result<(), Box<dyn Error>> {
+        self.vm.run(real_time)
     }
 
     fn print_ops(&mut self) {
         self.vm.print_ops();
-    }
-
-    fn emit_constant(&mut self, instrument: &mut Instrument, value: Value) {
-        match self.context_stack.last().unwrap() {
-            CompilerContext::InitFunc => instrument.emit_init_constant(value),
-            CompilerContext::PerfFunc => instrument.emit_perf_constant(value),
-            _ => unreachable!(),
-        }
     }
 
     fn emit_op(&mut self, instrument: &mut Instrument, op: Op) {
@@ -163,8 +159,12 @@ impl Compiler {
             } else if self.match_token(TokenType::BraceClose) {
                 break;
             } else {
-                self.error_at_current("Invalid token; expected instrument name".to_string());
+                self.error_at_current("Invalid token: expected instrument name".to_string());
                 return;
+            }
+
+            if self.had_error {
+                break;
             }
         }
 
@@ -193,6 +193,10 @@ impl Compiler {
                 self.error_at_current("Expected member variable, 'init', or 'perf'".to_string());
                 return;
             }
+
+            if self.had_error {
+                return;
+            }
         }
 
         self.vm.add_instrument(instrument);
@@ -200,7 +204,7 @@ impl Compiler {
     }
 
     fn member_variable(&mut self, instrument: &mut Instrument) {
-        let variable_name = self.previous.as_ref().clone().unwrap().text().clone();
+        let variable_name = self.previous.as_ref().unwrap().text().clone();
         if variable_name.chars().next().unwrap().is_uppercase() {
             self.error_at_previous(
                 "Argument and local identifier names must not begin with a capital letter"
@@ -229,7 +233,6 @@ impl Compiler {
         let context = *self.context_stack.last().unwrap();
 
         if self.match_token(TokenType::ParenOpen) {
-            let mut arg_count = 0;
             loop {
                 if self.match_token(TokenType::Identifier) {
                     let arg_name_token = self.previous.as_ref().unwrap().clone();
@@ -242,14 +245,13 @@ impl Compiler {
                     let type_token = self.current.as_ref().unwrap().token_type();
                     if type_token.is_type_ident() {
                         if type_token == TokenType::AudioIdent {
-                            self.error_at_current(format!("Invalid type for function argument"));
+                            self.error_at_current("Invalid type for function argument".to_string());
                             return;
                         }
                         self.advance(); // consume type ident
                         match context {
                             CompilerContext::InitFunc => {
                                 if !instrument.add_init_arg(
-                                    arg_count,
                                     arg_name_token.text().clone(),
                                     type_token.to_variable_type(),
                                 ) {
@@ -263,7 +265,6 @@ impl Compiler {
                             }
                             CompilerContext::PerfFunc => {
                                 if !instrument.add_perf_arg(
-                                    arg_count,
                                     arg_name_token.text().clone(),
                                     type_token.to_variable_type(),
                                 ) {
@@ -277,7 +278,6 @@ impl Compiler {
                             }
                             _ => unreachable!(),
                         }
-                        arg_count += 1;
                     } else {
                         self.error_at_current("Expected type identifier".to_string());
                         return;
@@ -293,6 +293,10 @@ impl Compiler {
                     break;
                 } else {
                     self.error_at_current("Expected argument name or ')'".to_string());
+                    return;
+                }
+
+                if self.had_error {
                     return;
                 }
             }
@@ -363,14 +367,15 @@ impl Compiler {
 
         self.advance(); // consume type token
         self.consume(TokenType::Equal, "Expected '='");
-        let expression_type = self.expression(instrument);
-        if expression_type != type_token.to_variable_type() {
-            self.error_at_previous(format!("Type mismatch: expected '{:?}' for assignment to local '{}' but got '{expression_type:?}'", type_token.to_variable_type(), local_name_token.text()));
-            return;
-        }
+        if let Some(expression_type) = self.expression(instrument) {
+            if expression_type != type_token.to_variable_type() {
+                self.error_at_previous(format!("Type mismatch: expected '{:?}' for assignment to local '{}' but got '{expression_type:?}'", type_token.to_variable_type(), local_name_token.text()));
+                return;
+            }
 
-        self.emit_op(instrument, Op::DeclareLocal);
-        self.consume(TokenType::Semicolon, "Expected ';'");
+            self.emit_op(instrument, Op::DeclareLocal);
+            self.consume(TokenType::Semicolon, "Expected ';'");
+        }
     }
 
     fn statement(&mut self, instrument: &mut Instrument) {
@@ -394,13 +399,18 @@ impl Compiler {
             }
         } else if self.match_token(TokenType::Output) {
             self.consume(TokenType::ParenOpen, "Expected '('");
-            let expression_type = self.expression(instrument);
-            if expression_type != VariableType::Audio {
-                self.error_at_previous(format!("Expected Audio for 'output' but got {expression_type:?}"));
+            if let Some(expression_type) = self.expression(instrument) {
+                if expression_type != VariableType::Audio {
+                    self.error_at_previous(format!(
+                        "Expected Audio for 'output' but got {expression_type:?}"
+                    ));
+                    return;
+                }
+                self.emit_op(instrument, Op::Output);
+                self.consume(TokenType::ParenClose, "Expected ')'");
+            } else {
                 return;
             }
-            self.emit_op(instrument, Op::Output);
-            self.consume(TokenType::ParenClose, "Expected ')'");
         } else if self.match_token(TokenType::Identifier) {
             self.assignment_statement(instrument);
         } else {
@@ -415,49 +425,47 @@ impl Compiler {
         if let Some(index) = instrument.get_variable(&variable_name) {
             self.consume(TokenType::Equal, "Expected '='");
             let variable_type = instrument.member_type(index);
-            let expression_type = self.expression(instrument);
-            if variable_type != expression_type {
-                self.error_at_previous(format!("Expected {variable_type:?} to assign to member variable '{variable_name}' but got {expression_type:?}"));
-                return;
+            if let Some(expression_type) = self.expression(instrument) {
+                if variable_type != expression_type {
+                    self.error_at_previous(format!("Expected {variable_type:?} to assign to member variable '{variable_name}' but got {expression_type:?}"));
+                    return;
+                }
+                self.emit_op(instrument, Op::AssignMember(index));
             }
-            self.emit_constant(instrument, Value::int(index as i64));
-            self.emit_op(instrument, Op::AssignMember);
         } else {
             match self.context_stack.last().unwrap() {
                 CompilerContext::InitFunc => {
                     if let Some(index) = instrument.get_local_init_variable(&variable_name) {
                         self.consume(TokenType::Equal, "Expected '='");
                         let variable_type = instrument.init_local_type(index);
-                        let expression_type = self.expression(instrument);
-                        if variable_type != expression_type {
-                            self.error_at_previous(format!("Expected {variable_type:?} to assign to local variable '{variable_name}' but got {expression_type:?}"));
-                            return;
+                        if let Some(expression_type) = self.expression(instrument) {
+                            if variable_type != expression_type {
+                                self.error_at_previous(format!("Expected {variable_type:?} to assign to local variable '{variable_name}' but got {expression_type:?}"));
+                                return;
+                            }
+                            self.emit_op(instrument, Op::AssignLocal(index));
                         }
-                        self.emit_constant(instrument, Value::int(index as i64));
-                        self.emit_op(instrument, Op::AssignLocal);
                     } else {
                         self.error_at_previous(format!(
                             "No member variable named '{variable_name}'"
                         ));
-                        return;
                     }
                 }
                 CompilerContext::PerfFunc => {
                     if let Some(index) = instrument.get_local_perf_variable(&variable_name) {
                         self.consume(TokenType::Equal, "Expected '='");
                         let variable_type = instrument.perf_local_type(index);
-                        let expression_type = self.expression(instrument);
-                        if variable_type != expression_type {
-                            self.error_at_previous(format!("Expected {variable_type:?} to assign to local variable '{variable_name}' but got {expression_type:?}"));
-                            return;
+                        if let Some(expression_type) = self.expression(instrument) {
+                            if variable_type != expression_type {
+                                self.error_at_previous(format!("Expected {variable_type:?} to assign to local variable '{variable_name}' but got {expression_type:?}"));
+                                return;
+                            }
+                            self.emit_op(instrument, Op::AssignLocal(index));
                         }
-                        self.emit_constant(instrument, Value::int(index as i64));
-                        self.emit_op(instrument, Op::AssignLocal);
                     } else {
                         self.error_at_previous(format!(
                             "No member variable named '{variable_name}'"
                         ));
-                        return;
                     }
                 }
                 _ => unreachable!(),
@@ -465,61 +473,118 @@ impl Compiler {
         }
     }
 
-    fn expression(&mut self, instrument: &mut Instrument) -> VariableType {
+    fn expression(&mut self, instrument: &mut Instrument) -> Option<VariableType> {
         self.term(instrument)
     }
 
     #[must_use]
-    fn term(&mut self, instrument: &mut Instrument) -> VariableType {
-        self.factor(instrument)
+    fn term(&mut self, instrument: &mut Instrument) -> Option<VariableType> {
+        if let Some(expression_type) = self.factor(instrument) {
+            loop {
+                if self.match_token(TokenType::Minus) {
+                    if let Some(rhs_type) = self.factor(instrument) {
+                        if expression_type.can_sum_with(rhs_type) {
+                            self.emit_op(instrument, Op::Subtract);
+                        } else {
+                            self.error_at_previous(format!(
+                                "Cannot subtract {rhs_type:?} from {expression_type:?}"
+                            ));
+                            return None;
+                        }
+                    }
+                } else if self.match_token(TokenType::Plus) {
+                    if let Some(rhs_type) = self.factor(instrument) {
+                        if expression_type.can_sum_with(rhs_type) {
+                            self.emit_op(instrument, Op::Add);
+                        } else {
+                            self.error_at_previous(format!(
+                                "Cannot add {rhs_type:?} to {expression_type:?}"
+                            ));
+                            return None;
+                        }
+                    }
+                } else {
+                    return Some(expression_type);
+                }
+            }
+        }
+
+        None
     }
 
     #[must_use]
-    fn factor(&mut self, instrument: &mut Instrument) -> VariableType {
-        self.call(instrument)
+    fn factor(&mut self, instrument: &mut Instrument) -> Option<VariableType> {
+        if let Some(expression_type) = self.call(instrument) {
+            loop {
+                if self.match_token(TokenType::Slash) {
+                    if let Some(rhs_type) = self.call(instrument) {
+                        if expression_type.can_factor_with(rhs_type) {
+                            self.emit_op(instrument, Op::Divide);
+                        } else {
+                            self.error_at_previous(format!(
+                                "Cannot divide {expression_type:?} by {rhs_type:?}"
+                            ));
+                            return None;
+                        }
+                    }
+                } else if self.match_token(TokenType::Star) {
+                    if let Some(rhs_type) = self.call(instrument) {
+                        if expression_type.can_factor_with(rhs_type) {
+                            self.emit_op(instrument, Op::Multiply);
+                        } else {
+                            self.error_at_previous(format!(
+                                "Cannot multiply {expression_type:?} by {rhs_type:?}"
+                            ));
+                            return None;
+                        }
+                    }
+                } else {
+                    return Some(expression_type);
+                }
+            }
+        }
+
+        None
     }
 
     #[must_use]
-    fn call(&mut self, instrument: &mut Instrument) -> VariableType {
+    fn call(&mut self, instrument: &mut Instrument) -> Option<VariableType> {
         self.primary(instrument)
     }
 
     #[must_use]
-    fn primary(&mut self, instrument: &mut Instrument) -> VariableType {
+    fn primary(&mut self, instrument: &mut Instrument) -> Option<VariableType> {
         if self.match_token(TokenType::Integer) {
             match self.previous.as_ref().unwrap().text().parse::<i64>() {
                 Ok(value) => {
-                    self.emit_constant(instrument, Value::int(value));
-                    self.emit_op(instrument, Op::LoadConstant);
-                    VariableType::Int
+                    self.emit_op(instrument, Op::LoadConstant(Value::int(value)));
+                    Some(VariableType::Int)
                 }
                 Err(err) => {
                     self.error_at_previous(format!("Error parsing Int: {err}"));
-                    VariableType::None
+                    None
                 }
             }
         } else if self.match_token(TokenType::Float) {
             match self.previous.as_ref().unwrap().text().parse::<f32>() {
                 Ok(value) => {
-                    self.emit_constant(instrument, Value::float(value));
-                    self.emit_op(instrument, Op::LoadConstant);
-                    VariableType::Float
+                    self.emit_op(instrument, Op::LoadConstant(Value::float(value)));
+                    Some(VariableType::Float)
                 }
                 Err(err) => {
                     self.error_at_previous(format!("Error parsing Int: {err}"));
-                    VariableType::None
+                    None
                 }
             }
         } else if self.match_token(TokenType::String) {
             match self.parse_string(self.previous.as_ref().unwrap().text()) {
                 Ok(value) => {
-                    self.emit_constant(instrument, Value::string(value));
-                    self.emit_op(instrument, Op::LoadConstant);
-                    VariableType::String
+                    self.emit_op(instrument, Op::LoadConstant(Value::string(value)));
+                    Some(VariableType::String)
                 }
                 Err(err) => {
                     self.error_at_previous(format!("Error parsing Int: {err}"));
-                    VariableType::None
+                    None
                 }
             }
         } else if self.match_token(TokenType::Identifier) {
@@ -530,7 +595,7 @@ impl Compiler {
             expression_type
         } else {
             self.error_at_current("Invalid token at start of expression".to_string());
-            VariableType::None
+            None
         }
     }
 
@@ -539,8 +604,7 @@ impl Compiler {
             't' => Some('\t'),
             'r' => Some('\r'),
             'n' => Some('\n'),
-            '\'' => Some('\''),
-            '"' => Some('\"'),
+            '"' => Some('"'),
             '\\' => Some('\\'),
             _ => None,
         }
@@ -549,7 +613,8 @@ impl Compiler {
     fn parse_string(&self, string: &String) -> Result<String, ParseStringError> {
         let mut res = String::new();
         let text = string.as_bytes();
-        for mut i in 1..text.len() - 1 {
+        let mut i = 1;
+        while i < text.len() - 1 {
             if text[i] == b'\\' {
                 i += 1;
                 if i == text.len() - 1 {
@@ -568,17 +633,19 @@ impl Compiler {
             } else {
                 res.push(text[i] as char);
             }
+            i += 1;
         }
 
+        println!("{res}");
         Ok(res)
     }
 
-    fn identifier(&mut self, instrument: &mut Instrument) -> VariableType {
+    fn identifier(&mut self, instrument: &mut Instrument) -> Option<VariableType> {
         let ident_text = self.previous.as_ref().unwrap().text().clone();
         if ident_text.chars().next().unwrap().is_uppercase() {
             if !vm::has_component(&ident_text) {
                 self.error_at_previous(format!("No component named '{ident_text}' found"));
-                return VariableType::None;
+                return None;
             }
 
             let info = vm::component_info(&ident_text);
@@ -591,78 +658,76 @@ impl Compiler {
                 } else {
                     if arg_count == info.input_types.len() {
                         self.error_at_current(format!("Too many inputs to '{ident_text}'"));
-                        return VariableType::None;
+                        return None;
                     }
 
-                    let expression_type = self.expression(instrument);
-                    if expression_type != info.input_types[arg_count] {
-                        self.error_at_previous(format!("Expected {:?} for input at position {arg_count} for {ident_text} but got {expression_type:?}", info.input_types[arg_count]));
-                        return VariableType::None;
-                    }
+                    if let Some(expression_type) = self.expression(instrument) {
+                        if expression_type != info.input_types[arg_count] {
+                            self.error_at_previous(format!("Expected {:?} for input at position {arg_count} for {ident_text} but got {expression_type:?}", info.input_types[arg_count]));
+                            return None;
+                        }
 
-                    arg_count += 1;
+                        arg_count += 1;
 
-                    if !self.check_token(TokenType::ParenClose) {
-                        self.consume(TokenType::Comma, "Expected ','");
+                        if !self.check_token(TokenType::ParenClose) {
+                            self.consume(TokenType::Comma, "Expected ','");
+                        }
+                    } else {
+                        return None;
                     }
                 }
             }
 
             if arg_count != info.input_types.len() {
-                self.error_at_previous(format!("Expected {} input args to {ident_text} but got {arg_count}", info.input_types.len()));
-                return VariableType::None;
+                self.error_at_previous(format!(
+                    "Expected {} input args to {ident_text} but got {arg_count}",
+                    info.input_types.len()
+                ));
+                return None;
             }
 
-            
             let index = match self.context_stack.last().unwrap() {
                 CompilerContext::InitFunc => instrument.add_init_component((info.factory)()),
                 CompilerContext::PerfFunc => instrument.add_perf_component((info.factory)()),
                 _ => unreachable!(),
             };
 
-            self.emit_constant(instrument, Value::int(index as i64));
-            self.emit_op(instrument, Op::CallComponent);
-            info.output_type
+            self.emit_op(instrument, Op::CallComponent(index));
+            Some(info.output_type)
         } else {
             match self.context_stack.last().unwrap() {
                 CompilerContext::InitFunc => {
                     if let Some(index) = instrument.get_init_arg(&ident_text) {
-                        self.emit_constant(instrument, Value::int(index as i64));
-                        self.emit_op(instrument, Op::LoadArg);
-                        instrument.init_arg_type(index)
+                        self.emit_op(instrument, Op::LoadArg(index));
+                        Some(instrument.init_arg_type(index))
                     } else if let Some(index) = instrument.get_local_init_variable(&ident_text) {
-                        self.emit_constant(instrument, Value::int(index as i64));
-                        self.emit_op(instrument, Op::LoadLocal);
-                        instrument.init_local_type(index)
+                        self.emit_op(instrument, Op::LoadLocal(index));
+                        Some(instrument.init_local_type(index))
                     } else if let Some(index) = instrument.get_variable(&ident_text) {
-                        self.emit_constant(instrument, Value::int(index as i64));
-                        self.emit_op(instrument, Op::LoadMember);
-                        instrument.member_type(index)
+                        self.emit_op(instrument, Op::LoadMember(index));
+                        Some(instrument.member_type(index))
                     } else {
                         self.error_at_previous(format!(
-                        "No member variable, argument, or local variable found named '{ident_text}'"
-                    ));
-                        VariableType::None
+                            "No member variable, argument, or local variable found named '{ident_text}'"
+                        ));
+                        None
                     }
                 }
                 CompilerContext::PerfFunc => {
                     if let Some(index) = instrument.get_perf_arg(&ident_text) {
-                        self.emit_constant(instrument, Value::int(index as i64));
-                        self.emit_op(instrument, Op::LoadArg);
-                        instrument.perf_arg_type(index)
+                        self.emit_op(instrument, Op::LoadArg(index));
+                        Some(instrument.perf_arg_type(index))
                     } else if let Some(index) = instrument.get_local_perf_variable(&ident_text) {
-                        self.emit_constant(instrument, Value::int(index as i64));
-                        self.emit_op(instrument, Op::LoadLocal);
-                        instrument.perf_local_type(index)
+                        self.emit_op(instrument, Op::LoadLocal(index));
+                        Some(instrument.perf_local_type(index))
                     } else if let Some(index) = instrument.get_variable(&ident_text) {
-                        self.emit_constant(instrument, Value::int(index as i64));
-                        self.emit_op(instrument, Op::LoadMember);
-                        instrument.member_type(index)
+                        self.emit_op(instrument, Op::LoadMember(index));
+                        Some(instrument.member_type(index))
                     } else {
                         self.error_at_previous(format!(
-                        "No member variable, argument, or local variable found named '{ident_text}'"
-                    ));
-                        VariableType::None
+                            "No member variable, argument, or local variable found named '{ident_text}'"
+                        ));
+                        None
                     }
                 }
                 _ => unreachable!(),
@@ -680,7 +745,7 @@ impl Compiler {
             } else if self.match_token(TokenType::Identifier) {
                 self.score_event();
             } else {
-                self.error_at_current("Invalid token; expected instrument name or '}'".to_string())
+                self.error_at_current("Invalid token: expected instrument name or '}'".to_string())
             }
 
             if self.had_error {
@@ -895,7 +960,7 @@ impl Compiler {
 
                 had_perf_call = true;
             } else {
-                self.error_at_current("Invalid token; expected 'init' or 'perf'".to_string());
+                self.error_at_current("Invalid token: expected 'init' or 'perf'".to_string());
                 return;
             }
         }

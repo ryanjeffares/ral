@@ -1,3 +1,7 @@
 pub mod generator;
+
+pub mod adsr;
+pub mod mtof;
 pub mod noise;
-pub mod sine;
+pub mod oscil;
+pub mod padsr;

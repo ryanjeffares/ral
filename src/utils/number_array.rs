@@ -66,6 +66,22 @@ impl<T: Number> NumberArray<T> {
         Self { ptr, len }
     }
 
+    pub fn new_with_value(len: usize, value: T) -> Self {
+        let ptr = unsafe {
+            let layout = Layout::from_size_align_unchecked(len * T::SIZE, T::ALIGNMENT);
+            let p = alloc(layout) as *mut T;
+            if p.is_null() {
+                handle_alloc_error(layout);
+            }
+            for i in 0..len {
+                *p.add(i) = value;
+            }
+            p
+        };
+
+        Self { ptr, len }
+    }
+
     pub fn fill(&mut self, value: T) {
         unsafe {
             for i in 0..self.len {

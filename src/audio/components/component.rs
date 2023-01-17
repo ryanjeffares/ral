@@ -1,6 +1,6 @@
-use dyn_clone::{DynClone, clone_trait_object};
+use dyn_clone::{clone_trait_object, DynClone};
 
-use crate::{audio::audio_buffer::AudioBuffer, runtime::value::Value};
+use crate::runtime::value::Value;
 
 pub struct StreamInfo {
     pub sample_rate: cpal::SampleRate,
@@ -8,9 +8,14 @@ pub struct StreamInfo {
     pub channels: usize,
 }
 
+pub enum ComponentType {
+    Generator,
+}
+
 pub trait Component: DynClone {
     fn arg_count(&self) -> usize;
-    fn get_next_audio_block(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> AudioBuffer;
+    fn component_type(&self) -> ComponentType;
+    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value;
 }
 
 clone_trait_object!(Component);

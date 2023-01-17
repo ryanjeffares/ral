@@ -7,13 +7,21 @@ use crate::{
         audio_buffer::AudioBuffer,
         components::{
             component::{Component, StreamInfo},
-            generators::{generator::Generator, noise::Noise, sine::Sine},
+            generators::{
+                adsr::Adsr, generator::Generator, mtof::Mtof, noise::Noise, oscil::Oscil,
+                padsr::Padsr,
+            },
         },
     },
     runtime::instrument::{Instrument, InstrumentEventInstance, VariableType},
     runtime::value::Value,
+    // utils::timer::Timer,
 };
-use std::{collections::HashMap, error::Error};
+use std::{
+    collections::HashMap,
+    error::Error,
+    // time::{Duration, Instant},
+};
 
 static COMPONENTS: phf::Map<&'static str, ComponentInfo> = phf_map! {
     "Noise" => ComponentInfo {
@@ -21,11 +29,26 @@ static COMPONENTS: phf::Map<&'static str, ComponentInfo> = phf_map! {
         input_types: &Noise::INPUT_TYPES,
         output_type: Noise::OUTPUT_TYPE,
     },
-    "Sine" => ComponentInfo {
-        factory: || Box::new(Sine::new()),
-        input_types: &Sine::INPUT_TYPES,
-        output_type: Sine::OUTPUT_TYPE,
-    }
+    "Oscil" => ComponentInfo {
+        factory: || Box::new(Oscil::new()),
+        input_types: &Oscil::INPUT_TYPES,
+        output_type: Oscil::OUTPUT_TYPE,
+    },
+    "Mtof" => ComponentInfo {
+        factory: || Box::new(Mtof{}),
+        input_types: &Mtof::INPUT_TYPES,
+        output_type: Mtof::OUTPUT_TYPE,
+    },
+    "Adsr" => ComponentInfo {
+        factory: || Box::new(Adsr::new()),
+        input_types: &Adsr::INPUT_TYPES,
+        output_type: Adsr::OUTPUT_TYPE,
+    },
+    "Padsr" => ComponentInfo {
+        factory: || Box::new(Padsr::new()),
+        input_types: &Padsr::INPUT_TYPES,
+        output_type: Padsr::OUTPUT_TYPE,
+    },
 };
 
 #[derive(Clone)]
@@ -36,6 +59,9 @@ pub struct VM {
     active_score_events: Vec<InstrumentEventInstance>,
     sample_counter: usize,
     audio_config: Option<SupportedStreamConfig>,
+    // total_perf_time: Duration,
+    // max_perf_time: Duration,
+    // perf_count: u32,
 }
 
 unsafe impl Send for VM {}
@@ -56,11 +82,11 @@ pub struct ComponentInfo {
     pub output_type: VariableType,
 }
 
-pub fn has_component(component_name: &String) -> bool {
-    COMPONENTS.contains_key(component_name.as_str())
+pub fn has_component(component_name: &str) -> bool {
+    COMPONENTS.contains_key(component_name)
 }
 
-pub fn component_info(component_name: &String) -> ComponentInfo {
+pub fn component_info(component_name: &str) -> ComponentInfo {
     COMPONENTS.get(component_name).unwrap().clone()
 }
 
@@ -73,6 +99,9 @@ impl VM {
             active_score_events: Vec::<InstrumentEventInstance>::new(),
             sample_counter: 0,
             audio_config: None,
+            // total_perf_time: Duration::ZERO,
+            // max_perf_time: Duration::ZERO,
+            // perf_count: 0,
         }
     }
 
@@ -155,16 +184,23 @@ impl VM {
         self.audio_config.as_ref().unwrap()
     }
 
-    pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
-        let stream = audio::stream::Stream::new(&self)?;
-        stream.play()?;
-        std::thread::sleep(std::time::Duration::from_secs_f32(stream.length_secs()));
-        Ok(())
+    pub fn run(&mut self, real_time: bool) -> Result<(), Box<dyn Error>> {
+        if real_time {
+            let stream = audio::stream::Stream::new(self)?;
+            stream.play()?;
+            // TODO: hacky way to make sure init calls still happen on 0 length scores
+            std::thread::sleep(std::time::Duration::from_secs_f32(
+                stream.length_secs().max(0.1),
+            ));
+            println!("Real time performance finished in {}s", stream.length_secs());
+            Ok(())
+        } else {
+            self.write_to_file()
+        }
     }
 
     pub fn sort_score_events(&mut self, sample_rate: cpal::SampleRate) -> f32 {
         let sr = sample_rate.0 as f32;
-        println!("Sample Rate: {sr}");
         let mut last_end_sample = 0.0;
         for event in self.score_events.iter() {
             let sample = (event.start_time * sr) as usize;
@@ -172,7 +208,7 @@ impl VM {
             if end_time > last_end_sample {
                 last_end_sample = end_time;
             }
-            println!("Adding sorted score event at {sample}: {event:?}");
+            // println!("Adding sorted score event at {sample}: {event:?}");
             if self.sorted_score_events.contains_key(&sample) {
                 self.sorted_score_events
                     .get_mut(&sample)
@@ -183,10 +219,14 @@ impl VM {
             }
         }
 
+        // println!("{:?}", self.sorted_score_events);
         last_end_sample
     }
 
     pub fn get_next_buffer(&mut self, channels: usize, buffer_size: usize) -> AudioBuffer {
+        // let _ = Timer::new("VM::get_next_buffer()");
+        // let timer = Instant::now();
+
         let mut buffer_to_fill = AudioBuffer::new(channels, buffer_size);
         let stream_info = StreamInfo {
             sample_rate: self.config().sample_rate(),
@@ -220,6 +260,66 @@ impl VM {
             }
         }
 
+        // println!("Max amplitude of buffer: {}", buffer_to_fill.max());
+        // let time = timer.elapsed();
+        // self.max_perf_time = self.max_perf_time.max(time);
+        // self.total_perf_time += time;
+        // self.perf_count += 1;
         buffer_to_fill
     }
+
+    fn write_to_file(&mut self) -> Result<(), Box<dyn Error>> {
+        const SAMPLE_RATE: u32 = 48000;
+        const BUFFER_SIZE: u32 = SAMPLE_RATE / 100;
+        const CHANNELS: u16 = 2;
+
+        self.add_config(SupportedStreamConfig::new(
+            CHANNELS,
+            cpal::SampleRate(SAMPLE_RATE),
+            cpal::SupportedBufferSize::Range {
+                min: BUFFER_SIZE,
+                max: BUFFER_SIZE,
+            },
+            cpal::SampleFormat::F32,
+        ));
+
+        let len =
+            (self.sort_score_events(self.config().sample_rate()) * (SAMPLE_RATE as f32)) as usize;
+        let spec = hound::WavSpec {
+            channels: CHANNELS,
+            sample_rate: SAMPLE_RATE,
+            bits_per_sample: (self.config().sample_format().sample_size() * 8) as u16,
+            sample_format: hound::SampleFormat::Float,
+        };
+
+        let path = std::env::current_dir()?.join("test.wav");
+        let mut writer = hound::WavWriter::create(path, spec)?;
+
+        let mut sample_counter = 0;
+        while sample_counter < len {
+            let buff = self.get_next_buffer(CHANNELS as usize, BUFFER_SIZE as usize);
+            for sample in 0..buff.buffer_size() {
+                for channel in 0..buff.channels() {
+                    writer.write_sample(buff.get_sample(channel, sample))?;
+                }
+            }
+            sample_counter += 480;
+        }
+
+        writer.finalize()?;
+        println!("{len} samples written to test.wav");
+        Ok(())
+    }
 }
+
+// impl Drop for VM {
+//     fn drop(&mut self) {
+//         if self.perf_count > 0 {
+//             println!("Max perf time: {:?}", self.max_perf_time);
+//             println!(
+//                 "Average perf time: {:?}",
+//                 self.total_perf_time / self.perf_count
+//             );
+//         }
+//     }
+// }

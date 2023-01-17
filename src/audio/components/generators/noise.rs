@@ -1,7 +1,7 @@
 use rand::{rngs::ThreadRng, Rng};
 
 use super::generator::Generator;
-use crate::audio::components::component::StreamInfo;
+use crate::audio::components::component::{ComponentType, StreamInfo};
 use crate::audio::{audio_buffer::AudioBuffer, components::component::Component};
 use crate::runtime::instrument::VariableType;
 use crate::runtime::value::Value;
@@ -24,7 +24,11 @@ impl Component for Noise {
         Self::INPUT_TYPES.len()
     }
 
-    fn get_next_audio_block(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> AudioBuffer {
+    fn component_type(&self) -> ComponentType {
+        ComponentType::Generator
+    }
+
+    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value {
         let mut buffer = AudioBuffer::new(stream_info.channels, stream_info.buffer_size);
         for sample in 0..stream_info.buffer_size {
             for channel in 0..stream_info.channels {
@@ -35,7 +39,8 @@ impl Component for Noise {
                 );
             }
         }
-        buffer
+
+        Value::audio(buffer)
     }
 }
 

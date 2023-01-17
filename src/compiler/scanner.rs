@@ -27,6 +27,10 @@ static SYMBOLS: phf::Map<&'static str, TokenType> = phf_map! {
     "(" => TokenType::ParenOpen,
     ")" => TokenType::ParenClose,
     ";" => TokenType::Semicolon,
+    "-" => TokenType::Minus,
+    "+" => TokenType::Plus,
+    "*" => TokenType::Star,
+    "/" => TokenType::Slash,
 };
 
 pub struct Scanner {
@@ -55,14 +59,18 @@ pub enum TokenType {
     IntIdent,
     Integer,
     Local,
+    Minus,
     Output,
     ParenOpen,
     ParenClose,
     PerfIdent,
+    Plus,
     Print,
     PrintLn,
     ScoreIdent,
     Semicolon,
+    Slash,
+    Star,
     String,
     StringIdent,
 }
@@ -122,15 +130,15 @@ impl Clone for Token {
 }
 
 impl TokenType {
-    pub fn is_type_ident(&self) -> bool {
-        *self == TokenType::FloatIdent
-            || *self == TokenType::IntIdent
-            || *self == TokenType::AudioIdent
-            || *self == TokenType::StringIdent
+    pub fn is_type_ident(self) -> bool {
+        self == TokenType::FloatIdent
+            || self == TokenType::IntIdent
+            || self == TokenType::AudioIdent
+            || self == TokenType::StringIdent
     }
 
-    pub fn to_variable_type(&self) -> VariableType {
-        match *self {
+    pub fn to_variable_type(self) -> VariableType {
+        match self {
             TokenType::IntIdent => VariableType::Int,
             TokenType::FloatIdent => VariableType::Float,
             TokenType::StringIdent => VariableType::String,
@@ -139,12 +147,12 @@ impl TokenType {
         }
     }
 
-    pub fn is_literal(&self) -> bool {
-        *self == TokenType::Integer || *self == TokenType::Float || *self == TokenType::String
+    pub fn is_literal(self) -> bool {
+        self == TokenType::Integer || self == TokenType::Float || self == TokenType::String
     }
 
-    pub fn is_operator(&self) -> bool {
-        *self == TokenType::Equal
+    pub fn is_operator(self) -> bool {
+        self == TokenType::Equal
     }
 }
 
@@ -157,10 +165,6 @@ impl Scanner {
             line: 1,
             column: 1,
         }
-    }
-
-    pub fn line(&self) -> usize {
-        self.line
     }
 
     pub fn get_code_at_line(&self, line: usize) -> String {

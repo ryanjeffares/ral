@@ -1,16 +1,17 @@
 use std::fmt;
 
 use crate::{
-    audio::{audio_buffer::AudioBuffer, components::component::{Component, StreamInfo}},
+    audio::{
+        audio_buffer::AudioBuffer,
+        components::component::{Component, ComponentType, StreamInfo},
+    },
     runtime::ops::Op,
-    runtime::value::Value,
-    utils::{number_array::NumberArray, timer::Timer},
+    runtime::value::Value, utils::timer::Timer,
 };
 
 #[derive(Clone)]
 struct Function {
     ops: Vec<Op>,
-    constants: Vec<Value>,
     args: Vec<InstrumentVariable>,
     locals: Vec<InstrumentVariable>,
     components: Vec<Box<dyn Component>>,
@@ -34,13 +35,33 @@ pub struct InstrumentEventInstance {
     perf_args: Vec<Value>,
     duration_samples: usize,
     sample_counter: usize,
+    max_amps: f32,
 }
 
 #[derive(Clone, Debug)]
 struct InstrumentVariable {
-    variable_index: usize,
     variable_name: String,
     variable_type: VariableType,
+}
+
+impl VariableType {
+    pub fn can_factor_with(&self, other: VariableType) -> bool {
+        match self {
+            VariableType::Audio => other != VariableType::String,
+            VariableType::Float => other == VariableType::Float || other == VariableType::Int,
+            VariableType::Int => other == VariableType::Float || other == VariableType::Int,
+            VariableType::String => false,
+        }
+    }
+
+    pub fn can_sum_with(&self, other: VariableType) -> bool {
+        match self {
+            VariableType::Audio => other != VariableType::String,
+            VariableType::Float => other == VariableType::Float || other == VariableType::Int,
+            VariableType::Int => other == VariableType::Float || other == VariableType::Int,
+            VariableType::String => other == VariableType::String,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -48,7 +69,6 @@ pub enum VariableType {
     Audio,
     Float,
     Int,
-    None,
     String,
 }
 
@@ -56,7 +76,6 @@ impl Function {
     fn new() -> Self {
         Function {
             ops: Vec::<Op>::new(),
-            constants: Vec::<Value>::new(),
             args: Vec::<InstrumentVariable>::new(),
             locals: Vec::<InstrumentVariable>::new(),
             components: Vec::<Box<dyn Component>>::new(),
@@ -89,6 +108,7 @@ impl Instrument {
             perf_args,
             duration_samples,
             sample_counter: 0,
+            max_amps: 0.0,
         }
     }
 
@@ -127,11 +147,8 @@ impl Instrument {
     }
 
     pub fn add_variable(&mut self, variable_name: String, variable_type: VariableType) {
-        self.variables.push(InstrumentVariable::new(
-            self.variables.len(),
-            variable_name,
-            variable_type,
-        ));
+        self.variables
+            .push(InstrumentVariable::new(variable_name, variable_type));
     }
 
     pub fn add_init_local(&mut self, variable_name: String, variable_type: VariableType) -> bool {
@@ -141,11 +158,9 @@ impl Instrument {
         {
             false
         } else {
-            self.init_func.locals.push(InstrumentVariable::new(
-                self.init_func.locals.len(),
-                variable_name,
-                variable_type,
-            ));
+            self.init_func
+                .locals
+                .push(InstrumentVariable::new(variable_name, variable_type));
             true
         }
     }
@@ -157,47 +172,31 @@ impl Instrument {
         {
             false
         } else {
-            self.perf_func.locals.push(InstrumentVariable::new(
-                self.perf_func.locals.len(),
-                variable_name,
-                variable_type,
-            ));
+            self.perf_func
+                .locals
+                .push(InstrumentVariable::new(variable_name, variable_type));
             true
         }
     }
 
-    pub fn add_init_arg(
-        &mut self,
-        arg_index: usize,
-        arg_name: String,
-        arg_type: VariableType,
-    ) -> bool {
-        if self.get_init_arg(&arg_name).is_some() {
-            false
-        } else if self.get_variable(&arg_name).is_some() {
+    pub fn add_init_arg(&mut self, arg_name: String, arg_type: VariableType) -> bool {
+        if self.get_init_arg(&arg_name).is_some() || self.get_variable(&arg_name).is_some() {
             false
         } else {
             self.init_func
                 .args
-                .push(InstrumentVariable::new(arg_index, arg_name, arg_type));
+                .push(InstrumentVariable::new(arg_name, arg_type));
             true
         }
     }
 
-    pub fn add_perf_arg(
-        &mut self,
-        arg_index: usize,
-        arg_name: String,
-        arg_type: VariableType,
-    ) -> bool {
-        if self.get_perf_arg(&arg_name).is_some() {
-            false
-        } else if self.get_variable(&arg_name).is_some() {
+    pub fn add_perf_arg(&mut self, arg_name: String, arg_type: VariableType) -> bool {
+        if self.get_perf_arg(&arg_name).is_some() || self.get_variable(&arg_name).is_some() {
             false
         } else {
             self.perf_func
                 .args
-                .push(InstrumentVariable::new(arg_index, arg_name, arg_type));
+                .push(InstrumentVariable::new(arg_name, arg_type));
             true
         }
     }
@@ -262,16 +261,8 @@ impl Instrument {
         self.init_func.ops.push(op);
     }
 
-    pub fn emit_init_constant(&mut self, value: Value) {
-        self.init_func.constants.push(value);
-    }
-
     pub fn emit_perf_op(&mut self, op: Op) {
         self.perf_func.ops.push(op);
-    }
-
-    pub fn emit_perf_constant(&mut self, value: Value) {
-        self.perf_func.constants.push(value);
     }
 }
 
@@ -287,8 +278,8 @@ impl fmt::Display for Instrument {
 
 impl InstrumentEventInstance {
     pub fn run_init(&mut self, stream_info: &StreamInfo, buffer_to_fill: &mut AudioBuffer) {
-        println!("INFO: running init for {}", self.instrument_name);
-        self.run_ops(false, stream_info, buffer_to_fill);        
+        // println!("INFO: running init for {}", self.instrument_name);
+        self.run_ops(false, stream_info, buffer_to_fill);
     }
 
     /// Returns true when the event is over
@@ -315,54 +306,49 @@ impl InstrumentEventInstance {
 
         let mut stack = Vec::<Value>::new();
         let mut locals = Vec::<Value>::new();
-        let mut constant_idx = 0;
 
         for op in &func.ops {
             match op {
-                Op::AssignLocal => {
-                    let index = func.constants[constant_idx].get_int() as usize;
-                    constant_idx += 1;
-                    locals[index] = stack.pop().unwrap();
+                Op::AssignLocal(index) => {
+                    locals[*index] = stack.pop().unwrap();
                 }
-                Op::AssignMember => {
-                    let index = func.constants[constant_idx].get_int() as usize;
-                    constant_idx += 1;
-                    self.variables[index] = stack.pop().unwrap();
+                Op::AssignMember(index) => {
+                    self.variables[*index] = stack.pop().unwrap();
                 }
-                Op::CallComponent => {
-                    let index = func.constants[constant_idx].get_int() as usize;
-                    let arg_count = func.components[index].arg_count();
+                Op::CallComponent(index) => {
+                    let arg_count = func.components[*index].arg_count();
+                    let component_type = func.components[*index].component_type();
                     let mut args = vec![Value::default(); arg_count];
                     for i in 0..arg_count {
                         args[arg_count - i - 1] = stack.pop().unwrap();
                     }
-                    stack.push(Value::audio(func.components[index].get_next_audio_block(stream_info, args)));
+
+                    match component_type {
+                        ComponentType::Generator => {
+                            stack.push(func.components[*index].process(stream_info, args));
+                        }
+                    }
                 }
                 Op::DeclareLocal => {
                     let value = stack.pop().unwrap();
                     locals.push(value);
                 }
-                Op::LoadArg => {
-                    let index = func.constants[constant_idx].get_int() as usize;
-                    constant_idx += 1;
-                    stack.push(args[index].clone());
+                Op::LoadArg(index) => {
+                    stack.push(args[*index].clone());
                 }
-                Op::LoadConstant => {
-                    stack.push(func.constants[constant_idx].clone());
-                    constant_idx += 1;
+                Op::LoadConstant(value) => {
+                    stack.push(value.clone());
                 }
-                Op::LoadLocal => {
-                    let index = func.constants[constant_idx].get_int() as usize;
-                    constant_idx += 1;
-                    stack.push(locals[index].clone());
+                Op::LoadLocal(index) => {
+                    stack.push(locals[*index].clone());
                 }
-                Op::LoadMember => {
-                    let index = func.constants[constant_idx].get_int() as usize;
-                    constant_idx += 1;
-                    stack.push(self.variables[index].clone());
+                Op::LoadMember(index) => {
+                    stack.push(self.variables[*index].clone());
                 }
                 Op::Output => {
-                    buffer_to_fill.add_from(stack.pop().unwrap().get_audio());
+                    let audio = stack.pop().unwrap();
+                    self.max_amps = self.max_amps.max(audio.get_audio().max());
+                    buffer_to_fill.add_from(audio.get_audio());
                 }
                 Op::Print => {
                     let value = stack.pop().unwrap();
@@ -378,6 +364,26 @@ impl InstrumentEventInstance {
                 Op::PrintLnEmpty => {
                     println!();
                 }
+                Op::Add => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    stack.push(lhs + rhs);
+                }
+                Op::Divide => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    stack.push(lhs / rhs);
+                }
+                Op::Multiply => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    stack.push(lhs * rhs);
+                }
+                Op::Subtract => {
+                    let rhs = stack.pop().unwrap();
+                    let lhs = stack.pop().unwrap();
+                    stack.push(lhs - rhs);
+                }
             }
         }
     }
@@ -385,19 +391,18 @@ impl InstrumentEventInstance {
 
 impl Drop for InstrumentEventInstance {
     fn drop(&mut self) {
-        println!("INFO: score event ended for {}", self.instrument_name);
+        // println!(
+        //     "INFO: score event ended for {}, max amps: {}",
+        //     self.instrument_name, self.max_amps
+        // );
     }
 }
+
 impl InstrumentVariable {
-    pub fn new(variable_index: usize, variable_name: String, variable_type: VariableType) -> Self {
+    pub fn new(variable_name: String, variable_type: VariableType) -> Self {
         InstrumentVariable {
-            variable_index,
             variable_name,
             variable_type,
         }
-    }
-
-    pub fn name(&self) -> &String {
-        &self.variable_name
     }
 }

@@ -3,10 +3,7 @@ use cpal::{
     BufferSize, BuildStreamError, Device, Sample, StreamConfig, SupportedStreamConfig,
 };
 // use rand::Rng;
-use std::{
-    error::Error,
-    fmt,
-};
+use std::{error::Error, fmt};
 
 use crate::runtime::vm::VM;
 
@@ -119,7 +116,7 @@ impl Stream {
     fn audio_callback<T>(channels: usize, data: &mut [T], vm: &mut VM)
     where
         T: Sample,
-    {        
+    {
         let buffer = vm.get_next_buffer(channels, data.len() / channels);
 
         for (sample_index, frame) in data.chunks_mut(channels).enumerate() {
