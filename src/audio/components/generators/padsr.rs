@@ -2,6 +2,7 @@ use crate::{
     audio::{
         audio_buffer::AudioBuffer,
         components::component::{Component, ComponentType, StreamInfo},
+        shared_audio_buffer::SharedAudioBuffer,
     },
     runtime::{instrument::VariableType, value::Value},
 };
@@ -29,7 +30,7 @@ impl Component for Padsr {
     }
 
     fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value {
-        let mut buffer = AudioBuffer::new(stream_info.channels, stream_info.buffer_size);
+        let mut buffer = SharedAudioBuffer::new(stream_info.channels, stream_info.buffer_size);
 
         let attack = args[0].get_float() * stream_info.sample_rate.0 as f32;
         let decay = args[1].get_float() * stream_info.sample_rate.0 as f32;

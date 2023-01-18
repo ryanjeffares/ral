@@ -6,7 +6,7 @@ use crate::{
         components::component::{Component, ComponentType, StreamInfo},
     },
     runtime::ops::Op,
-    runtime::value::Value, utils::timer::Timer,
+    runtime::value::Value
 };
 
 #[derive(Clone)]

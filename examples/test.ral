@@ -7,7 +7,7 @@ instruments {
         init(rootMidi: Int) {
             rootFreq = Mtof(rootMidi);
             thirdFreq = Mtof(rootMidi + 4);
-            fifthFreq = Mtof(rootMidi + 7);
+            fifthFreq = Mtof(rootMidi + 7);            
         }
 
         perf(amps: Float, shape: Int) {

@@ -15,12 +15,12 @@ use crate::{
     },
     runtime::instrument::{Instrument, InstrumentEventInstance, VariableType},
     runtime::value::Value,
-    // utils::timer::Timer,
 };
+
 use std::{
     collections::HashMap,
     error::Error,
-    // time::{Duration, Instant},
+    time::{Duration, Instant},
 };
 
 static COMPONENTS: phf::Map<&'static str, ComponentInfo> = phf_map! {
@@ -51,6 +51,20 @@ static COMPONENTS: phf::Map<&'static str, ComponentInfo> = phf_map! {
     },
 };
 
+#[derive(PartialEq)]
+pub enum OutputTarget {
+    Dac,
+    File,
+    None,
+}
+
+#[derive(PartialEq)]
+pub enum LogLevel {
+    Everything,
+    FinalStats,
+    Nothing,
+}
+
 #[derive(Clone)]
 pub struct VM {
     instruments: Vec<Instrument>,
@@ -59,9 +73,9 @@ pub struct VM {
     active_score_events: Vec<InstrumentEventInstance>,
     sample_counter: usize,
     audio_config: Option<SupportedStreamConfig>,
-    // total_perf_time: Duration,
-    // max_perf_time: Duration,
-    // perf_count: u32,
+    total_perf_time: Duration,
+    max_perf_time: Duration,
+    perf_count: u32,
 }
 
 unsafe impl Send for VM {}
@@ -99,9 +113,9 @@ impl VM {
             active_score_events: Vec::<InstrumentEventInstance>::new(),
             sample_counter: 0,
             audio_config: None,
-            // total_perf_time: Duration::ZERO,
-            // max_perf_time: Duration::ZERO,
-            // perf_count: 0,
+            total_perf_time: Duration::ZERO,
+            max_perf_time: Duration::ZERO,
+            perf_count: 0,
         }
     }
 
@@ -184,18 +198,27 @@ impl VM {
         self.audio_config.as_ref().unwrap()
     }
 
-    pub fn run(&mut self, real_time: bool) -> Result<(), Box<dyn Error>> {
-        if real_time {
-            let stream = audio::stream::Stream::new(self)?;
-            stream.play()?;
-            // TODO: hacky way to make sure init calls still happen on 0 length scores
-            std::thread::sleep(std::time::Duration::from_secs_f32(
-                stream.length_secs().max(0.1),
-            ));
-            println!("Real time performance finished in {}s", stream.length_secs());
-            Ok(())
-        } else {
-            self.write_to_file()
+    pub fn run(&mut self, output_target: OutputTarget) -> Result<(), Box<dyn Error>> {
+        match output_target {
+            OutputTarget::Dac => {
+                let stream = audio::stream::Stream::new(self)?;
+                stream.play()?;
+                // TODO: hacky way to make sure init calls still happen on 0 length scores
+                std::thread::sleep(std::time::Duration::from_secs_f32(
+                    stream.length_secs().max(0.1),
+                ));
+                println!(
+                    "Real time performance finished in {}s",
+                    stream.length_secs()
+                );
+                Ok(())
+            }
+            OutputTarget::File => {
+                self.write_to_file()
+            }
+            OutputTarget::None => {
+                self.run_no_output()
+            }
         }
     }
 
@@ -224,8 +247,8 @@ impl VM {
     }
 
     pub fn get_next_buffer(&mut self, channels: usize, buffer_size: usize) -> AudioBuffer {
-        // let _ = Timer::new("VM::get_next_buffer()");
-        // let timer = Instant::now();
+        // let _timer = Timer::new("VM::get_next_buffer()");
+        let timer = Instant::now();
 
         let mut buffer_to_fill = AudioBuffer::new(channels, buffer_size);
         let stream_info = StreamInfo {
@@ -261,10 +284,10 @@ impl VM {
         }
 
         // println!("Max amplitude of buffer: {}", buffer_to_fill.max());
-        // let time = timer.elapsed();
-        // self.max_perf_time = self.max_perf_time.max(time);
-        // self.total_perf_time += time;
-        // self.perf_count += 1;
+        let time = timer.elapsed();
+        self.max_perf_time = self.max_perf_time.max(time);
+        self.total_perf_time += time;
+        self.perf_count += 1;
         buffer_to_fill
     }
 
@@ -310,16 +333,43 @@ impl VM {
         println!("{len} samples written to test.wav");
         Ok(())
     }
+
+    fn run_no_output(&mut self) -> Result<(), Box<dyn Error>> {
+        const SAMPLE_RATE: u32 = 48000;
+        const BUFFER_SIZE: u32 = SAMPLE_RATE / 100;
+        const CHANNELS: u16 = 2;
+
+        self.add_config(SupportedStreamConfig::new(
+            CHANNELS,
+            cpal::SampleRate(SAMPLE_RATE),
+            cpal::SupportedBufferSize::Range {
+                min: BUFFER_SIZE,
+                max: BUFFER_SIZE,
+            },
+            cpal::SampleFormat::F32,
+        ));
+
+        let len =
+            (self.sort_score_events(self.config().sample_rate()) * (SAMPLE_RATE as f32)) as usize;
+
+        let mut sample_counter = 0;
+        while sample_counter < len {
+            self.get_next_buffer(CHANNELS as usize, BUFFER_SIZE as usize);
+            sample_counter += 480;
+        }
+
+        Ok(())
+    }
 }
 
-// impl Drop for VM {
-//     fn drop(&mut self) {
-//         if self.perf_count > 0 {
-//             println!("Max perf time: {:?}", self.max_perf_time);
-//             println!(
-//                 "Average perf time: {:?}",
-//                 self.total_perf_time / self.perf_count
-//             );
-//         }
-//     }
-// }
+impl Drop for VM {
+    fn drop(&mut self) {
+        if self.perf_count > 0 {
+            println!("Max perf time: {:?}", self.max_perf_time);
+            println!(
+                "Average perf time: {:?}",
+                self.total_perf_time / self.perf_count
+            );
+        }
+    }
+}

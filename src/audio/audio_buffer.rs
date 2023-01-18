@@ -1,6 +1,6 @@
 use crate::utils::number_array::NumberArray;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct AudioBuffer {
     channels: usize,
     buffer_size: usize,

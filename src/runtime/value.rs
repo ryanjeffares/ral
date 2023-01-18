@@ -2,10 +2,9 @@ use std::{
     fmt,
     mem::ManuallyDrop,
     ops::{Add, Div, Mul, Sub},
-    rc::Rc,
 };
 
-use crate::audio::audio_buffer::AudioBuffer;
+use crate::audio::shared_audio_buffer::SharedAudioBuffer;
 
 pub struct Value {
     value_type: ValueType,
@@ -24,7 +23,7 @@ union Data {
     int: i64,
     float: f32,
     string: ManuallyDrop<Box<String>>,
-    audio: ManuallyDrop<Rc<AudioBuffer>>,
+    audio: ManuallyDrop<SharedAudioBuffer>,
 }
 
 impl Value {
@@ -51,11 +50,11 @@ impl Value {
         }
     }
 
-    pub fn audio(value: AudioBuffer) -> Self {
+    pub fn audio(value: SharedAudioBuffer) -> Self {
         Value {
             value_type: ValueType::Audio,
             value: Data {
-                audio: ManuallyDrop::<Rc<AudioBuffer>>::new(Rc::new(value)),
+                audio: ManuallyDrop::<SharedAudioBuffer>::new(value),
             },
         }
     }
@@ -72,8 +71,12 @@ impl Value {
         unsafe { self.value.float }
     }
 
-    pub fn get_audio(&self) -> &AudioBuffer {
-        unsafe { self.value.audio.as_ref() }
+    pub fn get_audio(&self) -> &SharedAudioBuffer {
+        unsafe { &self.value.audio }
+    }
+
+    pub fn get_audio_mut(&mut self) -> &mut SharedAudioBuffer {
+        unsafe { &mut self.value.audio }
     }
 
     pub fn get_string(&self) -> &String {
@@ -279,9 +282,7 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         unsafe {
             match self.value_type {
-                ValueType::Audio => {
-                    write!(f, "{:?}", self.value.audio.as_ref())
-                }
+                ValueType::Audio => fmt::Display::fmt(&*self.value.audio, f),
                 ValueType::Int => fmt::Display::fmt(&self.value.int, f),
                 ValueType::Float => fmt::Display::fmt(&self.value.float, f),
                 ValueType::String => fmt::Display::fmt(&*self.value.string, f),

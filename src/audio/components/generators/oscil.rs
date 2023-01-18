@@ -4,6 +4,7 @@ use super::generator::Generator;
 use crate::audio::{
     audio_buffer::AudioBuffer,
     components::component::{Component, ComponentType, StreamInfo},
+    shared_audio_buffer::SharedAudioBuffer,
 };
 use crate::runtime::{instrument::VariableType, value::Value};
 
@@ -35,11 +36,19 @@ impl Component for Oscil {
     }
 
     fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value {
-        let mut buffer = AudioBuffer::new(stream_info.channels, stream_info.buffer_size);
+        let mut buffer = SharedAudioBuffer::new(stream_info.channels, stream_info.buffer_size);
 
         let amps = args[0].get_float();
         let freq = args[1].get_float();
-        let shape: Shape = args[2].get_int().into();
+        let shape;
+        match Shape::try_from(args[2].get_int()) {
+            Ok(s) => shape = s,
+            Err(_) => {
+                eprintln!("No oscil shape for integer {}", args[2].get_int());
+                return Value::audio(buffer);
+            }
+        };
+
         let sr = stream_info.sample_rate.0 as f32;
 
         for sample in 0..stream_info.buffer_size {
@@ -98,14 +107,19 @@ impl Generator<3> for Oscil {
     const OUTPUT_TYPE: VariableType = VariableType::Audio;
 }
 
-impl From<i64> for Shape {
-    fn from(value: i64) -> Self {
+pub enum ShapeError {
+    OutOfBounds,
+}
+
+impl TryFrom<i64> for Shape {
+    type Error = ShapeError;
+    fn try_from(value: i64) -> Result<Shape, ShapeError> {
         match value {
-            0 => Shape::Sine,
-            1 => Shape::Saw,
-            2 => Shape::Square,
-            3 => Shape::Tri,
-            _ => panic!("No oscil shape for integer value {value}"),
+            0 => Ok(Shape::Sine),
+            1 => Ok(Shape::Saw),
+            2 => Ok(Shape::Square),
+            3 => Ok(Shape::Tri),
+            _ => Err(ShapeError::OutOfBounds),
         }
     }
 }

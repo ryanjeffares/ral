@@ -1,5 +1,7 @@
 use std::{error::Error, fmt, fs, path::Path};
 
+use runtime::vm::OutputTarget;
+
 mod audio;
 mod compiler;
 mod runtime;
@@ -25,11 +27,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         ))));
     }
 
-    let mut real_time = false;
+    let mut output_target = OutputTarget::None;
     let file_path = Path::new(&args[1]);
     for arg in args.iter().skip(2) {
-        if arg == "--rt" {
-            real_time = true;
+        if arg == "--dac" {
+            if output_target != OutputTarget::None {
+                usage();
+                return Err(Box::new(ArgumentError(String::from(
+                    "output target is mutually exclusive",
+                ))));
+            }
+            output_target = OutputTarget::Dac;
+        } else if arg == "--file" {
+            if output_target != OutputTarget::None {
+                usage();
+                return Err(Box::new(ArgumentError(String::from(
+                    "output target is mutually exclusive",
+                ))));
+            }
+            output_target = OutputTarget::File;
         } else {
             usage();
             return Err(Box::new(ArgumentError(String::from("unknown argument"))));
@@ -38,7 +54,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let code = fs::read_to_string(file_path)?;
     // let code = include_str!("../examples/test.ral").to_string();
-    compiler::compiler::compile_and_run(code, String::from(file_path.to_str().unwrap()), real_time)
+    compiler::compiler::compile_and_run(
+        code,
+        String::from(file_path.to_str().unwrap()),
+        output_target,
+    )
 }
 
 fn usage() {

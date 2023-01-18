@@ -6,7 +6,7 @@ use crate::{
     compiler::scanner::{Scanner, Token, TokenType},
     runtime::instrument::{Instrument, VariableType},
     runtime::ops::Op,
-    runtime::value::Value,
+    runtime::{value::Value, vm::OutputTarget},
     runtime::vm::{self, VM},
     utils::timer::Timer,
 };
@@ -54,7 +54,7 @@ struct Compiler {
 pub fn compile_and_run(
     code: String,
     file_path: String,
-    real_time: bool,
+    output_target: OutputTarget,
 ) -> Result<(), Box<dyn Error>> {
     let mut compiler = Compiler {
         file_path,
@@ -76,7 +76,7 @@ pub fn compile_and_run(
     } else {
         compiler.print_ops();
         let _timer = Timer::new("Run");
-        compiler.run(real_time)?;
+        compiler.run(output_target)?;
     }
 
     Ok(())
@@ -106,8 +106,8 @@ impl Compiler {
         }
     }
 
-    fn run(&mut self, real_time: bool) -> Result<(), Box<dyn Error>> {
-        self.vm.run(real_time)
+    fn run(&mut self, output_target: OutputTarget) -> Result<(), Box<dyn Error>> {
+        self.vm.run(output_target)
     }
 
     fn print_ops(&mut self) {
