@@ -6,8 +6,8 @@ use crate::{
     compiler::scanner::{Scanner, Token, TokenType},
     runtime::instrument::{Instrument, VariableType},
     runtime::ops::Op,
-    runtime::{value::Value, vm::OutputTarget},
     runtime::vm::{self, VM},
+    runtime::{value::Value, vm::OutputTarget},
     utils::timer::Timer,
 };
 

@@ -79,7 +79,7 @@ impl Clone for SharedAudioBuffer {
             self.ptr.as_ref().inc_ref_count();
         }
         Self {
-            ptr: self.ptr.clone(),
+            ptr: self.ptr,
             phantom: PhantomData,
         }
     }

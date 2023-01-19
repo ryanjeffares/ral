@@ -53,13 +53,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // for _ in 0..10 {
-        // let code = fs::read_to_string(file_path)?;
-        let code = include_str!("../examples/test.ral").to_string();
-        compiler::compiler::compile_and_run(
-            code,
-            String::from(file_path.to_str().unwrap()),
-            output_target,
-        )
+    // let code = fs::read_to_string(file_path)?;
+    let code = include_str!("../examples/test.ral").to_string();
+    compiler::compiler::compile_and_run(
+        code,
+        String::from(file_path.to_str().unwrap()),
+        output_target,
+    )
     // }
 
     // Ok(())

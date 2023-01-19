@@ -86,8 +86,12 @@ struct ScoreEvent {
     start_time: f32,
     duration: f32,
     init_args: Vec<Value>,
-    final_init_args: Option<&'static Vec<Value>>,
     perf_args: Vec<Value>,
+    // these static references are created by a Box::leak call after the whole score is compiled.
+    // this is to avoid copying the Vecs for the score event, instead the InstrumentEventInstance
+    // can take a static reference.
+    // this leaks right now, but maybe that's fine?
+    final_init_args: Option<&'static Vec<Value>>,
     final_perf_args: Option<&'static Vec<Value>>,
 }
 
@@ -182,8 +186,8 @@ impl VM {
             start_time,
             duration,
             init_args,
-            final_init_args: None,
             perf_args,
+            final_init_args: None,
             final_perf_args: None,
         });
     }
@@ -217,12 +221,8 @@ impl VM {
                 );
                 Ok(())
             }
-            OutputTarget::File => {
-                self.write_to_file()
-            }
-            OutputTarget::None => {
-                self.run_no_output()
-            }
+            OutputTarget::File => self.write_to_file(),
+            OutputTarget::None => self.run_no_output(),
         }
     }
 
@@ -296,7 +296,7 @@ impl VM {
 
         // println!("Max amplitude of buffer: {}", buffer_to_fill.max());
         let time = timer.elapsed();
-        println!("{:?}", time);
+        println!("{time:?}");
         self.max_perf_time = self.max_perf_time.max(time);
         self.total_perf_time += time;
         self.perf_count += 1;
@@ -318,8 +318,7 @@ impl VM {
             cpal::SampleFormat::F32,
         ));
 
-        let len =
-            (self.finalise(self.config().sample_rate()) * (SAMPLE_RATE as f32)) as usize;
+        let len = (self.finalise(self.config().sample_rate()) * (SAMPLE_RATE as f32)) as usize;
         let spec = hound::WavSpec {
             channels: CHANNELS,
             sample_rate: SAMPLE_RATE,
@@ -361,8 +360,7 @@ impl VM {
             cpal::SampleFormat::F32,
         ));
 
-        let len =
-            (self.finalise(self.config().sample_rate()) * (SAMPLE_RATE as f32)) as usize;
+        let len = (self.finalise(self.config().sample_rate()) * (SAMPLE_RATE as f32)) as usize;
 
         let mut sample_counter = 0;
         while sample_counter < len {

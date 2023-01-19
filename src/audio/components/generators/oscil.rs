@@ -40,9 +40,8 @@ impl Component for Oscil {
 
         let amps = args[0].get_float();
         let freq = args[1].get_float();
-        let shape;
-        match Shape::try_from(args[2].get_int()) {
-            Ok(s) => shape = s,
+        let shape = match Shape::try_from(args[2].get_int()) {
+            Ok(s) => s,
             Err(_) => {
                 eprintln!("No oscil shape for integer {}", args[2].get_int());
                 return Value::audio(buffer);

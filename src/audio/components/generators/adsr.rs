@@ -1,4 +1,7 @@
-use crate::{audio::components::component::{Component, ComponentType, StreamInfo}, runtime::{instrument::VariableType, value::Value}};
+use crate::{
+    audio::components::component::{Component, ComponentType, StreamInfo},
+    runtime::{instrument::VariableType, value::Value},
+};
 
 use super::generator::Generator;
 
@@ -38,10 +41,8 @@ impl Component for Adsr {
             // decay phase
             let base = self.sample_clock - attack;
             let level = 1.0 - (base / decay);
-            output = sustain_level + ((1.0 - sustain_level) * level);            
-        } else if (self.sample_clock >= attack + decay)
-            && (self.sample_clock < total - release)
-        {
+            output = sustain_level + ((1.0 - sustain_level) * level);
+        } else if (self.sample_clock >= attack + decay) && (self.sample_clock < total - release) {
             // sustain phase
             output = sustain_level;
         } else if (self.sample_clock >= total - release)
@@ -50,7 +51,7 @@ impl Component for Adsr {
             // release phase
             let base = self.sample_clock - (total - release);
             let level = 1.0 - (base / release);
-            output =  sustain_level * level;
+            output = sustain_level * level;
         } else {
             // after release
             output = 0.0;

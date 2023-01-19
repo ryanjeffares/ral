@@ -20,6 +20,9 @@ struct Function {
 
 #[derive(Clone)]
 struct FunctionEventInstance {
+    // this static reference is created by a Box::leak call in the VM after the whole score is compiled.
+    // this is to avoid copying the Vec from the function for each score event, instead we can take a static reference here.
+    // this leaks right now, but maybe that's fine?
     ops: &'static Vec<Op>,
     components: Vec<Box<dyn Component>>,
 }
@@ -37,8 +40,11 @@ pub struct InstrumentEventInstance {
     instrument_name: String,
     variables: Vec<Value>,
     init_func: FunctionEventInstance,
-    init_args: &'static Vec<Value>,
     perf_func: FunctionEventInstance,
+    // these static references are created by a Box::leak call in the VM after the whole score is compiled.
+    // this is to avoid copying the Vecs from the score event, instead we can take a static reference here.
+    // this leaks right now, but maybe that's fine?
+    init_args: &'static Vec<Value>,
     perf_args: &'static Vec<Value>,
     duration_samples: usize,
     sample_counter: usize,
@@ -127,8 +133,8 @@ impl Instrument {
             instrument_name: self.instrument_name.clone(),
             variables: vec![Value::default(); self.variables.len()],
             init_func: self.init_func.create_event_instance(),
-            init_args,
             perf_func: self.perf_func.create_event_instance(),
+            init_args,
             perf_args,
             duration_samples,
             sample_counter: 0,
@@ -302,7 +308,7 @@ impl fmt::Display for Instrument {
 
 impl InstrumentEventInstance {
     pub fn run_init(&mut self, stream_info: &StreamInfo, buffer_to_fill: &mut AudioBuffer) {
-        // println!("INFO: running init for {}", self.instrument_name);
+        println!("INFO: running init for {}", self.instrument_name);
         self.run_ops(false, stream_info, buffer_to_fill);
     }
 
@@ -322,11 +328,7 @@ impl InstrumentEventInstance {
             &mut self.init_func
         };
 
-        let args = if perf {
-            &self.perf_args
-        } else {
-            &self.init_args
-        };
+        let args = if perf { self.perf_args } else { self.init_args };
 
         let mut stack = Vec::<Value>::new();
         let mut locals = Vec::<Value>::new();

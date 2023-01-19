@@ -2,7 +2,8 @@ use std::{
     alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, Layout},
     borrow::{Borrow, BorrowMut},
     fmt,
-    ops::{Deref, DerefMut, Index, IndexMut}, marker::PhantomData,
+    marker::PhantomData,
+    ops::{Deref, DerefMut, Index, IndexMut},
 };
 
 macro_rules! impl_trait_for_types {
@@ -51,7 +52,11 @@ impl<T: Number> NumberArray<T> {
             p as *mut T
         };
 
-        Self { ptr, len, phantom: PhantomData }
+        Self {
+            ptr,
+            len,
+            phantom: PhantomData,
+        }
     }
 
     pub fn new_uninitialised(len: usize) -> Self {
@@ -64,7 +69,11 @@ impl<T: Number> NumberArray<T> {
             p as *mut T
         };
 
-        Self { ptr, len, phantom: PhantomData }
+        Self {
+            ptr,
+            len,
+            phantom: PhantomData,
+        }
     }
 
     pub fn new_with_value(len: usize, value: T) -> Self {
@@ -80,7 +89,11 @@ impl<T: Number> NumberArray<T> {
             p
         };
 
-        Self { ptr, len, phantom: PhantomData }
+        Self {
+            ptr,
+            len,
+            phantom: PhantomData,
+        }
     }
 
     pub fn fill(&mut self, value: T) {
@@ -278,7 +291,11 @@ impl<T: Number> Clone for NumberArray<T> {
             for i in 0..self.len {
                 *ptr.add(i) = self[i];
             }
-            NumberArray { ptr, len: self.len, phantom: PhantomData }
+            NumberArray {
+                ptr,
+                len: self.len,
+                phantom: PhantomData,
+            }
         }
     }
 }
