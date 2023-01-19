@@ -58,7 +58,7 @@ impl Stream {
 
         let mut vm = vm_ref.clone();
         vm.add_config(config.clone());
-        let length = vm.sort_score_events(config.sample_rate());
+        let length = vm.finalise(config.sample_rate());
 
         Ok(Stream {
             length,

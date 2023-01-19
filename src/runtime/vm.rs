@@ -86,7 +86,9 @@ struct ScoreEvent {
     start_time: f32,
     duration: f32,
     init_args: Vec<Value>,
+    final_init_args: Option<&'static Vec<Value>>,
     perf_args: Vec<Value>,
+    final_perf_args: Option<&'static Vec<Value>>,
 }
 
 #[derive(Clone)]
@@ -180,7 +182,9 @@ impl VM {
             start_time,
             duration,
             init_args,
+            final_init_args: None,
             perf_args,
+            final_perf_args: None,
         });
     }
 
@@ -222,10 +226,17 @@ impl VM {
         }
     }
 
-    pub fn sort_score_events(&mut self, sample_rate: cpal::SampleRate) -> f32 {
+    pub fn finalise(&mut self, sample_rate: cpal::SampleRate) -> f32 {
+        for instrument in self.instruments.iter_mut() {
+            instrument.finalise();
+        }
+
         let sr = sample_rate.0 as f32;
         let mut last_end_sample = 0.0;
-        for event in self.score_events.iter() {
+        for event in self.score_events.iter_mut() {
+            event.final_init_args = Some(Box::leak(Box::new(event.init_args.clone())));
+            event.final_perf_args = Some(Box::leak(Box::new(event.perf_args.clone())));
+
             let sample = (event.start_time * sr) as usize;
             let end_time = event.start_time + event.duration;
             if end_time > last_end_sample {
@@ -263,8 +274,8 @@ impl VM {
                     let index = event.instrument_index;
                     let mut instrument = self.instruments[index].create_event_instance(
                         (event.duration * self.config().sample_rate().0 as f32) as usize,
-                        event.init_args.clone(),
-                        event.perf_args.clone(),
+                        event.final_init_args.unwrap(),
+                        event.final_perf_args.unwrap(),
                     );
                     instrument.run_init(&stream_info, &mut buffer_to_fill);
                     self.active_score_events.push(instrument);
@@ -285,6 +296,7 @@ impl VM {
 
         // println!("Max amplitude of buffer: {}", buffer_to_fill.max());
         let time = timer.elapsed();
+        // println!("{:?}", time);
         self.max_perf_time = self.max_perf_time.max(time);
         self.total_perf_time += time;
         self.perf_count += 1;
@@ -307,7 +319,7 @@ impl VM {
         ));
 
         let len =
-            (self.sort_score_events(self.config().sample_rate()) * (SAMPLE_RATE as f32)) as usize;
+            (self.finalise(self.config().sample_rate()) * (SAMPLE_RATE as f32)) as usize;
         let spec = hound::WavSpec {
             channels: CHANNELS,
             sample_rate: SAMPLE_RATE,
@@ -350,7 +362,7 @@ impl VM {
         ));
 
         let len =
-            (self.sort_score_events(self.config().sample_rate()) * (SAMPLE_RATE as f32)) as usize;
+            (self.finalise(self.config().sample_rate()) * (SAMPLE_RATE as f32)) as usize;
 
         let mut sample_counter = 0;
         while sample_counter < len {

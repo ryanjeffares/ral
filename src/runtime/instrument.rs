@@ -6,14 +6,21 @@ use crate::{
         components::component::{Component, ComponentType, StreamInfo},
     },
     runtime::ops::Op,
-    runtime::value::Value
+    runtime::value::Value,
 };
 
 #[derive(Clone)]
 struct Function {
     ops: Vec<Op>,
+    final_ops: Option<&'static Vec<Op>>,
     args: Vec<InstrumentVariable>,
     locals: Vec<InstrumentVariable>,
+    components: Vec<Box<dyn Component>>,
+}
+
+#[derive(Clone)]
+struct FunctionEventInstance {
+    ops: &'static Vec<Op>,
     components: Vec<Box<dyn Component>>,
 }
 
@@ -29,10 +36,10 @@ pub struct Instrument {
 pub struct InstrumentEventInstance {
     instrument_name: String,
     variables: Vec<Value>,
-    init_func: Function,
-    init_args: Vec<Value>,
-    perf_func: Function,
-    perf_args: Vec<Value>,
+    init_func: FunctionEventInstance,
+    init_args: &'static Vec<Value>,
+    perf_func: FunctionEventInstance,
+    perf_args: &'static Vec<Value>,
     duration_samples: usize,
     sample_counter: usize,
     max_amps: f32,
@@ -76,9 +83,21 @@ impl Function {
     fn new() -> Self {
         Function {
             ops: Vec::<Op>::new(),
+            final_ops: None,
             args: Vec::<InstrumentVariable>::new(),
             locals: Vec::<InstrumentVariable>::new(),
             components: Vec::<Box<dyn Component>>::new(),
+        }
+    }
+
+    fn finalise(&mut self) {
+        self.final_ops = Some(Box::leak(Box::new(self.ops.clone())));
+    }
+
+    fn create_event_instance(&self) -> FunctionEventInstance {
+        FunctionEventInstance {
+            ops: self.final_ops.unwrap(),
+            components: self.components.clone(),
         }
     }
 }
@@ -93,18 +112,23 @@ impl Instrument {
         }
     }
 
+    pub fn finalise(&mut self) {
+        self.init_func.finalise();
+        self.perf_func.finalise();
+    }
+
     pub fn create_event_instance(
         &self,
         duration_samples: usize,
-        init_args: Vec<Value>,
-        perf_args: Vec<Value>,
+        init_args: &'static Vec<Value>,
+        perf_args: &'static Vec<Value>,
     ) -> InstrumentEventInstance {
         InstrumentEventInstance {
             instrument_name: self.instrument_name.clone(),
             variables: vec![Value::default(); self.variables.len()],
-            init_func: self.init_func.clone(),
+            init_func: self.init_func.create_event_instance(),
             init_args,
-            perf_func: self.perf_func.clone(),
+            perf_func: self.perf_func.create_event_instance(),
             perf_args,
             duration_samples,
             sample_counter: 0,
@@ -307,7 +331,7 @@ impl InstrumentEventInstance {
         let mut stack = Vec::<Value>::new();
         let mut locals = Vec::<Value>::new();
 
-        for op in &func.ops {
+        for op in func.ops {
             match op {
                 Op::AssignLocal(index) => {
                     locals[*index] = stack.pop().unwrap();
