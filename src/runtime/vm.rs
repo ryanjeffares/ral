@@ -51,7 +51,7 @@ static COMPONENTS: phf::Map<&'static str, ComponentInfo> = phf_map! {
     },
 };
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum OutputTarget {
     Dac,
     File,

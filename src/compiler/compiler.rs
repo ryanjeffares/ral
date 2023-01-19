@@ -74,7 +74,7 @@ pub fn compile_and_run(
     if compiler.had_error() {
         eprintln!("Stopping execution due to compilation errors");
     } else {
-        compiler.print_ops();
+        // compiler.print_ops();
         let _timer = Timer::new("Run");
         compiler.run(output_target)?;
     }
