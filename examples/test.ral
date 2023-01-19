@@ -50,52 +50,52 @@ instruments {
 }
 
 score {
-    MajorChord(0.0 2.0 init(48) perf(0.05 1));
-    MajorChord(2.0 2.0 init(53) perf(0.05 1));
-    MinorChord(4.0 2.0 init(57) perf(0.05 1));
-    MajorChord(6.0 2.0 init(55) perf(0.05 1));
+    MajorChord(0.0 0.1 init(48) perf(0.05 1));
+    // MajorChord(2.0 2.0 init(53) perf(0.05 1));
+    // MinorChord(4.0 2.0 init(57) perf(0.05 1));
+    // MajorChord(6.0 2.0 init(55) perf(0.05 1));
 
-    Kick(0.0 0.2 perf(0.4));
-    Noise(0.25 0.1 perf(0.1 0.1));
-    Kick(0.5 0.2 perf(0.4));
-    Noise(0.5 0.2 perf(0.2 0.2));
-    Noise(0.75 0.1 perf(0.1 0.1));
-    Kick(1.0 0.2 perf(0.4));
-    Noise(1.25 0.1 perf(0.1 0.1));
-    Kick(1.5 0.2 perf(0.4));
-    Noise(1.5 0.2 perf(0.2 0.2));
-    Noise(1.75 0.1 perf(0.1 0.1));
-
-    Kick(2.0 0.2 perf(0.4));
-    Noise(2.25 0.1 perf(0.1 0.1));
-    Kick(2.5 0.2 perf(0.4));
-    Noise(2.75 0.1 perf(0.1 0.1));
-    Noise(2.5 0.2 perf(0.2 0.2));
-    Kick(3.0 0.2 perf(0.4));
-    Noise(3.25 0.1 perf(0.1 0.1));
-    Kick(3.5 0.2 perf(0.4));
-    Noise(3.5 0.2 perf(0.2 0.2));
-    Noise(3.75 0.1 perf(0.1 0.1));
-
-    Kick(4.0 0.2 perf(0.4));
-    Noise(4.25 0.1 perf(0.1 0.1));
-    Kick(4.5 0.2 perf(0.4));
-    Noise(4.5 0.2 perf(0.2 0.2));
-    Noise(4.75 0.1 perf(0.1 0.1));
-    Kick(5.0 0.2 perf(0.4));
-    Noise(5.25 0.1 perf(0.1 0.1));
-    Kick(5.5 0.2 perf(0.4));
-    Noise(5.5 0.2 perf(0.2 0.2));
-    Noise(5.75 0.1 perf(0.1 0.1));
-
-    Kick(6.0 0.2 perf(0.4));
-    Noise(6.25 0.1 perf(0.1 0.1));
-    Kick(6.5 0.2 perf(0.4));
-    Noise(6.5 0.2 perf(0.2 0.2));
-    Noise(6.75 0.1 perf(0.1 0.1));
-    Kick(7.0 0.2 perf(0.4));
-    Noise(7.25 0.1 perf(0.1 0.1));
-    Kick(7.5 0.2 perf(0.4));
-    Noise(7.5 0.2 perf(0.2 0.2));
-    Noise(7.75 0.1 perf(0.1 0.1));
+    Kick(0.0 0.1 perf(0.4));
+    Noise(0.0 0.1 perf(0.1 0.1));
+    // Kick(0.5 0.2 perf(0.4));
+    // Noise(0.5 0.2 perf(0.2 0.2));
+    // Noise(0.75 0.1 perf(0.1 0.1));
+    // Kick(1.0 0.2 perf(0.4));
+    // Noise(1.25 0.1 perf(0.1 0.1));
+    // Kick(1.5 0.2 perf(0.4));
+    // Noise(1.5 0.2 perf(0.2 0.2));
+    // Noise(1.75 0.1 perf(0.1 0.1));
+// 
+    // Kick(2.0 0.2 perf(0.4));
+    // Noise(2.25 0.1 perf(0.1 0.1));
+    // Kick(2.5 0.2 perf(0.4));
+    // Noise(2.75 0.1 perf(0.1 0.1));
+    // Noise(2.5 0.2 perf(0.2 0.2));
+    // Kick(3.0 0.2 perf(0.4));
+    // Noise(3.25 0.1 perf(0.1 0.1));
+    // Kick(3.5 0.2 perf(0.4));
+    // Noise(3.5 0.2 perf(0.2 0.2));
+    // Noise(3.75 0.1 perf(0.1 0.1));
+// 
+    // Kick(4.0 0.2 perf(0.4));
+    // Noise(4.25 0.1 perf(0.1 0.1));
+    // Kick(4.5 0.2 perf(0.4));
+    // Noise(4.5 0.2 perf(0.2 0.2));
+    // Noise(4.75 0.1 perf(0.1 0.1));
+    // Kick(5.0 0.2 perf(0.4));
+    // Noise(5.25 0.1 perf(0.1 0.1));
+    // Kick(5.5 0.2 perf(0.4));
+    // Noise(5.5 0.2 perf(0.2 0.2));
+    // Noise(5.75 0.1 perf(0.1 0.1));
+// 
+    // Kick(6.0 0.2 perf(0.4));
+    // Noise(6.25 0.1 perf(0.1 0.1));
+    // Kick(6.5 0.2 perf(0.4));
+    // Noise(6.5 0.2 perf(0.2 0.2));
+    // Noise(6.75 0.1 perf(0.1 0.1));
+    // Kick(7.0 0.2 perf(0.4));
+    // Noise(7.25 0.1 perf(0.1 0.1));
+    // Kick(7.5 0.2 perf(0.4));
+    // Noise(7.5 0.2 perf(0.2 0.2));
+    // Noise(7.75 0.1 perf(0.1 0.1));
 }
