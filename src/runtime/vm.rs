@@ -296,7 +296,7 @@ impl VM {
 
         // println!("Max amplitude of buffer: {}", buffer_to_fill.max());
         let time = timer.elapsed();
-        // println!("{:?}", time);
+        println!("{:?}", time);
         self.max_perf_time = self.max_perf_time.max(time);
         self.total_perf_time += time;
         self.perf_count += 1;
