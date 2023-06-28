@@ -11,8 +11,13 @@ instruments {
         }
 
         perf(amps: Float, shape: Int) {
-            local env: Audio = Padsr(0.3, 0.1, 0.5, 1.0, 2.0) * amps;
-            output(Oscil(1.0, rootFreq, shape)*env + Oscil(1.0, thirdFreq, shape)*env + Oscil(1.0, fifthFreq, shape)*env);
+            local env: Float = Adsr(0.3, 0.1, 0.5, 1.0, 2.0) * amps;
+
+            local third: Audio = Oscil(1.0, thirdFreq, shape)*env * 0.5;
+            local left: Audio = Oscil(1.0, rootFreq, shape)*env + third;
+            local right: Audio = Oscil(1.0, fifthFreq, shape)*env + third;
+
+            output(left, right);
         }
     }
 
@@ -28,8 +33,13 @@ instruments {
         }
 
         perf(amps: Float, shape: Int) {
-            local env: Audio = Padsr(0.3, 0.1, 0.5, 1.0, 2.0) * amps;
-            output(Oscil(1.0, rootFreq, shape)*env + Oscil(1.0, thirdFreq, shape)*env + Oscil(1.0, fifthFreq, shape)*env);
+            local env: Float = Adsr(0.3, 0.1, 0.5, 1.0, 2.0) * amps;
+
+            local third: Audio = Oscil(1.0, thirdFreq, shape)*env * 0.5;
+            local left: Audio = Oscil(1.0, rootFreq, shape)*env + third;
+            local right: Audio = Oscil(1.0, fifthFreq, shape)*env + third;
+
+            output(left, right);
         }
     }
 
@@ -37,14 +47,16 @@ instruments {
         perf(amps: Float) {
             local env: Audio = Padsr(0.01, 0.01, 1.0, 0.2, 0.2) * amps;
             local freq: Float = Adsr(0.01, 0.01, 1.0, 0.2, 0.2) * 110.0;
-            output(Oscil(1.0, freq, 0) * env);
+            local audio: Audio = Oscil(1.0, freq, 0) * env;
+            output(audio, audio);
         }
     }
 
     Noise {
         perf(amps: Float, time: Float) {
             local env: Audio = Padsr(0.01, 0.01, 1.0, time, time) * amps;
-            output(Noise(1.0) * env);
+            local audio: Audio = Noise(1.0) * env;
+            output(audio, audio);
         }
     }
 }

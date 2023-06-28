@@ -3,7 +3,7 @@ use dyn_clone::{clone_trait_object, DynClone};
 use crate::runtime::value::Value;
 
 pub struct StreamInfo {
-    pub sample_rate: cpal::SampleRate,
+    pub sample_rate: u32,
     pub buffer_size: usize,
     pub channels: usize,
 }

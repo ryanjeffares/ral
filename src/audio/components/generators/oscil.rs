@@ -2,7 +2,6 @@ use std::f32::consts::PI;
 
 use super::generator::Generator;
 use crate::audio::{
-    audio_buffer::AudioBuffer,
     components::component::{Component, ComponentType, StreamInfo},
     shared_audio_buffer::SharedAudioBuffer,
 };
@@ -36,7 +35,7 @@ impl Component for Oscil {
     }
 
     fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value {
-        let mut buffer = SharedAudioBuffer::new(stream_info.channels, stream_info.buffer_size);
+        let mut buffer = SharedAudioBuffer::new(1, stream_info.buffer_size);
 
         let amps = args[0].get_float();
         let freq = args[1].get_float();
@@ -48,7 +47,7 @@ impl Component for Oscil {
             }
         };
 
-        let sr = stream_info.sample_rate.0 as f32;
+        let sr = stream_info.sample_rate as f32;
 
         for sample in 0..stream_info.buffer_size {
             let value = match shape {
@@ -91,9 +90,8 @@ impl Component for Oscil {
                     }
                 }
             };
-            for channel in 0..stream_info.channels {
-                buffer.set_sample(channel, sample, value * amps);
-            }
+
+            buffer.set_sample(0, sample, value * amps);
         }
 
         Value::audio(buffer)

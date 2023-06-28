@@ -281,16 +281,33 @@ impl<T: Number + fmt::Debug> fmt::Debug for NumberArray<T> {
     }
 }
 
+//impl<T: Number> Clone for NumberArray<T> {
+//    fn clone(&self) -> Self {
+//        unsafe {
+//            let ptr = alloc(Layout::from_size_align_unchecked(
+//                self.len * T::SIZE,
+//                T::ALIGNMENT,
+//            )) as *mut T;
+//            for i in 0..self.len {
+//                *ptr.add(i) = self[i];
+//            }
+//            NumberArray {
+//                ptr,
+//                len: self.len,
+//                phantom: PhantomData,
+//            }
+//        }
+//    }
+//}
+
 impl<T: Number> Clone for NumberArray<T> {
     fn clone(&self) -> Self {
         unsafe {
-            let ptr = alloc(Layout::from_size_align_unchecked(
-                self.len * T::SIZE,
-                T::ALIGNMENT,
-            )) as *mut T;
+            let ptr = alloc(Layout::from_size_align_unchecked(self.len * T::SIZE, T::ALIGNMENT)) as *mut T;
             for i in 0..self.len {
                 *ptr.add(i) = self[i];
             }
+
             NumberArray {
                 ptr,
                 len: self.len,

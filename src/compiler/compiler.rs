@@ -3,6 +3,7 @@ use std::{error::Error, fmt};
 use colored::Colorize;
 
 use crate::{
+    audio::stream,
     compiler::scanner::{Scanner, Token, TokenType},
     runtime::instrument::{Instrument, VariableType},
     runtime::ops::Op,
@@ -56,7 +57,7 @@ pub fn compile_and_run(
     file_path: String,
     output_target: OutputTarget,
 ) -> Result<(), Box<dyn Error>> {
-    let mut compiler = Compiler {
+    let mut compiler: Compiler = Compiler {
         file_path,
         scanner: Scanner::new(code),
         had_error: false,
@@ -399,6 +400,19 @@ impl Compiler {
             }
         } else if self.match_token(TokenType::Output) {
             self.consume(TokenType::ParenOpen, "Expected '('");
+            if let Some(expression_type) = self.expression(instrument) {
+                if expression_type != VariableType::Audio {
+                    self.error_at_previous(format!(
+                        "Expected Audio for 'output' but got {expression_type:?}"
+                    ));
+                    return;
+                }
+            } else {
+                return;
+            }
+
+            self.consume(TokenType::Comma, "Expected ','");
+
             if let Some(expression_type) = self.expression(instrument) {
                 if expression_type != VariableType::Audio {
                     self.error_at_previous(format!(

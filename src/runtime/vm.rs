@@ -211,14 +211,17 @@ impl VM {
             OutputTarget::Dac => {
                 let stream = audio::stream::Stream::new(self)?;
                 stream.play()?;
+
                 // TODO: hacky way to make sure init calls still happen on 0 length scores
                 std::thread::sleep(std::time::Duration::from_secs_f32(
                     stream.length_secs().max(0.1),
                 ));
+
                 println!(
                     "Real time performance finished in {}s",
                     stream.length_secs()
                 );
+
                 Ok(())
             }
             OutputTarget::File => self.write_to_file(),
@@ -263,7 +266,7 @@ impl VM {
 
         let mut buffer_to_fill = AudioBuffer::new(channels, buffer_size);
         let stream_info = StreamInfo {
-            sample_rate: self.config().sample_rate(),
+            sample_rate: self.config().sample_rate().0,
             buffer_size,
             channels,
         };

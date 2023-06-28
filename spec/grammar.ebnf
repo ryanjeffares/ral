@@ -1,5 +1,5 @@
 (* Top Level *)
-program = instrumentsDeclaration, scoreDeclaration ;
+program = [ settingsDeclaration ], [ instrumentsDeclaration ], [ scoreDeclaration ] EOF ;
 instrumentsDeclaration = "instruments", "{", [ { instrument } ], "}", ;
 scoreDeclaration = "score", "{", [ { scoreEvent } ] ;
 

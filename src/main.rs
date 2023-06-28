@@ -1,4 +1,4 @@
-use std::{error::Error, fmt, fs, path::Path};
+use std::{error::Error, fmt, path::Path, fs};
 
 use runtime::vm::OutputTarget;
 
@@ -52,17 +52,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // for _ in 0..10 {
-    // let code = fs::read_to_string(file_path)?;
-    let code = include_str!("../examples/test.ral").to_string();
+    let code = fs::read_to_string(file_path)?;
     compiler::compiler::compile_and_run(
         code,
         String::from(file_path.to_str().unwrap()),
         output_target,
     )
-    // }
-
-    // Ok(())
 }
 
 fn usage() {

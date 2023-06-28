@@ -61,19 +61,37 @@ impl AudioBuffer {
     }
 
     pub fn add_from(&mut self, source: &AudioBuffer) {
-        assert!(self.channels == source.channels && self.buffer_size == source.buffer_size);
+        assert!(self.buffer_size == source.buffer_size);
+
         for channel in 0..self.channels {
-            for sample in 0..self.buffer_size {
-                self.data[channel][sample] += source.get_sample(channel, sample);
+            if channel < source.channels() {
+                for sample in 0..self.buffer_size {
+                    self.data[channel][sample] += source.get_sample(channel, sample);
+                }
             }
         }
     }
 
     pub fn subtract_from(&mut self, source: &AudioBuffer) {
-        assert!(self.channels == source.channels && self.buffer_size == source.buffer_size);
+        assert!(self.buffer_size == source.buffer_size);
+
         for channel in 0..self.channels {
-            for sample in 0..self.buffer_size {
-                self.data[channel][sample] -= source.get_sample(channel, sample);
+            if channel < source.channels() {
+                for sample in 0..self.buffer_size {
+                    self.data[channel][sample] -= source.get_sample(channel, sample);
+                }
+            }
+        }
+    }
+
+    pub fn multiply_by(&mut self, other: &AudioBuffer) {
+        assert!(self.buffer_size == other.buffer_size());
+
+        for channel in 0..self.channels {
+            if channel < other.channels() {
+                for sample in 0..self.buffer_size {
+                    self.data[channel][sample] *= other.get_sample(channel, sample);
+                }
             }
         }
     }
@@ -90,14 +108,6 @@ impl AudioBuffer {
         for channel in 0..self.channels {
             for sample in 0..self.buffer_size {
                 self.data[channel][sample] += add;
-            }
-        }
-    }
-
-    pub fn multiply_by(&mut self, other: &AudioBuffer) {
-        for channel in 0..self.channels {
-            for sample in 0..self.buffer_size {
-                self.data[channel][sample] *= other.get_sample(channel, sample);
             }
         }
     }

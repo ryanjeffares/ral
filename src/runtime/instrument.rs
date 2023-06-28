@@ -372,9 +372,22 @@ impl InstrumentEventInstance {
                     stack.push(self.variables[*index].clone());
                 }
                 Op::Output => {
-                    let audio = stack.pop().unwrap();
-                    self.max_amps = self.max_amps.max(audio.get_audio().max());
-                    buffer_to_fill.add_from(audio.get_audio());
+                    let right = stack.pop().unwrap();
+                    let right = right.get_audio();
+                    let left = stack.pop().unwrap();
+                    let left = left.get_audio();
+
+                    self.max_amps = self.max_amps.max(left.max()).max(right.max());
+                    
+                    for channel in 0..buffer_to_fill.channels() {
+                        for sample in 0..buffer_to_fill.buffer_size() {
+                            buffer_to_fill.add_sample(channel, sample, match channel {
+                                0 => left.get_sample(0, sample),
+                                1 => right.get_sample(0, sample),
+                                _ => unreachable!()
+                            })
+                        }
+                    }
                 }
                 Op::Print => {
                     let value = stack.pop().unwrap();

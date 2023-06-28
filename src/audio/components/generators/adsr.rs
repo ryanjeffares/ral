@@ -28,11 +28,11 @@ impl Component for Adsr {
     fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value {
         let output;
 
-        let attack = args[0].get_float() * stream_info.sample_rate.0 as f32;
-        let decay = args[1].get_float() * stream_info.sample_rate.0 as f32;
+        let attack = args[0].get_float() * stream_info.sample_rate as f32;
+        let decay = args[1].get_float() * stream_info.sample_rate as f32;
         let sustain_level = args[2].get_float();
-        let release = args[3].get_float() * stream_info.sample_rate.0 as f32;
-        let total = args[4].get_float() * stream_info.sample_rate.0 as f32;
+        let release = args[3].get_float() * stream_info.sample_rate as f32;
+        let total = args[4].get_float() * stream_info.sample_rate as f32;
 
         if self.sample_clock < attack {
             // attack phase
