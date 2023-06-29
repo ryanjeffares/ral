@@ -1,3 +1,5 @@
+#![feature(once_cell)]
+
 use std::{error::Error, fmt, path::Path, fs};
 
 use runtime::vm::OutputTarget;

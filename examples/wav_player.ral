@@ -1,0 +1,12 @@
+instruments {
+    WavPlayer {
+        perf(amps: Float) {
+            local audio: Audio = WavPlayer("C:/Users/ryand/Downloads/Suspirium1.wav") * amps;
+            output(audio, audio);
+        }
+    }
+}
+
+score {
+    WavPlayer(0.0 10.0 perf(100.0));
+}

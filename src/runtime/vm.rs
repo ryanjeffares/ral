@@ -9,7 +9,7 @@ use crate::{
             component::{Component, StreamInfo},
             generators::{
                 adsr::Adsr, generator::Generator, mtof::Mtof, noise::Noise, oscil::Oscil,
-                padsr::Padsr,
+                padsr::Padsr, wav_player::WavPlayer,
             },
         },
     },
@@ -49,6 +49,11 @@ static COMPONENTS: phf::Map<&'static str, ComponentInfo> = phf_map! {
         input_types: &Padsr::INPUT_TYPES,
         output_type: Padsr::OUTPUT_TYPE,
     },
+    "WavPlayer" => ComponentInfo {
+        factory: || Box::new(WavPlayer::new()),
+        input_types: &WavPlayer::INPUT_TYPES,
+        output_type: WavPlayer::OUTPUT_TYPE,
+    }
 };
 
 #[derive(Clone, Copy, PartialEq)]
