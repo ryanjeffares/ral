@@ -321,45 +321,54 @@ impl Compiler {
     }
 
     fn local_declaration(&mut self, instrument: &mut Instrument) {
-        self.consume(TokenType::Identifier, "Expected identifier");
-        let local_name_token = self.previous.as_ref().unwrap().clone();
-        if local_name_token
-            .text()
-            .chars()
-            .next()
-            .unwrap()
-            .is_uppercase()
-        {
-            self.error_at_previous(
-                "Argument and local identifier names must not begin with a capital letter"
-                    .to_string(),
-            );
+        if !self.check_token(TokenType::Identifier) {
+            self.error_at_current("Expected identifier".to_string());
             return;
         }
+
+        let mut local_name_tokens = Vec::<Token>::new();
+        while self.match_token(TokenType::Identifier) {
+            let name_token = self.previous.as_ref().unwrap().clone();
+            if name_token.text().chars().next().unwrap().is_uppercase() {
+                self.error_at_previous(
+                    "Argument and local identifier names must not begin with a captial letter"
+                        .to_string(),
+                );
+                return;
+            }
+
+            local_name_tokens.push(name_token);
+            if !self.match_token(TokenType::Comma) {
+                break;
+            }
+        }
+
         self.consume(TokenType::Colon, "Expected ':'");
 
         let type_token = self.current.as_ref().unwrap().token_type();
         if type_token.is_type_ident() {
-            match self.context_stack.last().unwrap() {
-                CompilerContext::InitFunc => {
-                    if !instrument.add_init_local(
-                        local_name_token.text().clone(),
-                        type_token.to_variable_type(),
-                    ) {
-                        self.error(&local_name_token, "A member variable, argument, or local variable with the same name already exists".to_string());
-                        return;
+            for name_token in &local_name_tokens {
+                match self.context_stack.last().unwrap() {
+                    CompilerContext::InitFunc => {
+                        if !instrument.add_init_local(
+                            name_token.text().clone(),
+                            type_token.to_variable_type(),
+                        ) {
+                            self.error(&name_token, "A member variable, argument, or local variable with the same name already exists".to_string());
+                            return;
+                        }
                     }
-                }
-                CompilerContext::PerfFunc => {
-                    if !instrument.add_perf_local(
-                        local_name_token.text().clone(),
-                        type_token.to_variable_type(),
-                    ) {
-                        self.error(&local_name_token, "A member variable, argument, or local variable with the same name already exists".to_string());
-                        return;
+                    CompilerContext::PerfFunc => {
+                        if !instrument.add_perf_local(
+                            name_token.text().clone(),
+                            type_token.to_variable_type(),
+                        ) {
+                            self.error(&name_token, "A member variable, argument, or local variable with the same name already exists".to_string());
+                            return;
+                        }
                     }
+                    _ => unreachable!(),
                 }
-                _ => unreachable!(),
             }
         } else {
             self.error_at_current("Expected type identifier".to_string());
@@ -368,9 +377,10 @@ impl Compiler {
 
         self.advance(); // consume type token
         self.consume(TokenType::Equal, "Expected '='");
+        // todo: need a way of checking in the run time if the amount of values produced by the expression matches the amount of locals declared
         if let Some(expression_type) = self.expression(instrument) {
             if expression_type != type_token.to_variable_type() {
-                self.error_at_previous(format!("Type mismatch: expected '{:?}' for assignment to local '{}' but got '{expression_type:?}'", type_token.to_variable_type(), local_name_token.text()));
+                self.error_at_previous(format!("Type mismatch: expected '{:?}' for assignment to locals {:?} but got '{expression_type:?}'", type_token.to_variable_type(), local_name_tokens.iter().map(|token| token.text()).collect::<Vec<&String>>()));
                 return;
             }
 

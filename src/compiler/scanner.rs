@@ -94,6 +94,12 @@ impl fmt::Display for Token {
     }
 }
 
+impl fmt::Debug for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
 impl Token {
     pub fn token_type(&self) -> TokenType {
         self.token_type

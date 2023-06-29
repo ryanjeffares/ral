@@ -1,8 +1,8 @@
 instruments {
     WavPlayer {
         perf {
-            local audio: Audio = WavPlayer("C:/Users/ryand/Downloads/Suspirium1.wav");
-            output(audio, audio);
+            local left, right: Float = WavPlayer("C:/Users/ryand/Downloads/Suspirium1.wav");
+            output(left, right);
         }
     }
 }
