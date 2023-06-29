@@ -1,5 +1,6 @@
 use cpal::SupportedStreamConfig;
 use phf::phf_map;
+use sndfile::{OpenOptions, WriteOptions, SndFileIO};
 
 use crate::{
     audio::{
@@ -9,7 +10,7 @@ use crate::{
             component::{Component, StreamInfo},
             generators::{
                 adsr::Adsr, generator::Generator, mtof::Mtof, noise::Noise, oscil::Oscil,
-                padsr::Padsr, wav_player::WavPlayer,
+                padsr::Padsr, sample::Sample,
             },
         },
     },
@@ -50,9 +51,9 @@ static COMPONENTS: phf::Map<&'static str, ComponentInfo> = phf_map! {
         output_type: Padsr::OUTPUT_TYPE,
     },
     "WavPlayer" => ComponentInfo {
-        factory: || Box::new(WavPlayer::new()),
-        input_types: &WavPlayer::INPUT_TYPES,
-        output_type: WavPlayer::OUTPUT_TYPE,
+        factory: || Box::new(Sample::new()),
+        input_types: &Sample::INPUT_TYPES,
+        output_type: Sample::OUTPUT_TYPE,
     }
 };
 
@@ -304,7 +305,7 @@ impl VM {
 
         // println!("Max amplitude of buffer: {}", buffer_to_fill.max());
         let time = timer.elapsed();
-        println!("{time:?}");
+        // println!("{time:?}");
         self.max_perf_time = self.max_perf_time.max(time);
         self.total_perf_time += time;
         self.perf_count += 1;
@@ -327,29 +328,31 @@ impl VM {
         ));
 
         let len = (self.finalise(self.config().sample_rate()) * (SAMPLE_RATE as f32)) as usize;
-        let spec = hound::WavSpec {
-            channels: CHANNELS,
-            sample_rate: SAMPLE_RATE,
-            bits_per_sample: (self.config().sample_format().sample_size() * 8) as u16,
-            sample_format: hound::SampleFormat::Float,
+        let path = std::env::current_dir()?.join("test.wav");
+        let mut snd = match OpenOptions::WriteOnly(WriteOptions::new(sndfile::MajorFormat::WAV, sndfile::SubtypeFormat::FLOAT, sndfile::Endian::CPU, 48000, 2)).from_path(path) {
+            Ok(snd) => snd,
+            Err(err) => {
+                panic!("Failed to open file: {:?}", err);
+            }
         };
 
-        let path = std::env::current_dir()?.join("test.wav");
-        let mut writer = hound::WavWriter::create(path, spec)?;
-
         let mut sample_counter = 0;
+        let mut samples = Vec::<f32>::new();
         while sample_counter < len {
             let buff = self.get_next_buffer(CHANNELS as usize, BUFFER_SIZE as usize);
             for sample in 0..buff.buffer_size() {
                 for channel in 0..buff.channels() {
-                    writer.write_sample(buff.get_sample(channel, sample))?;
+                    samples.push(buff.get_sample(channel, sample));
                 }
             }
             sample_counter += 480;
         }
 
-        writer.finalize()?;
-        println!("{len} samples written to test.wav");
+        match snd.write_from_slice(samples.as_slice()) {
+            Ok(len) => println!("{len} samples written to test.wav"),
+            Err(err) => eprintln!("Failed to write to wav: {:?}", err),
+        }
+        
         Ok(())
     }
 

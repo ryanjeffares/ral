@@ -1,6 +1,6 @@
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    BufferSize, BuildStreamError, Device, Sample, StreamConfig, SupportedStreamConfig,
+    BufferSize, BuildStreamError, Device, Sample, StreamConfig, SupportedStreamConfig, FromSample,
 };
 // use rand::Rng;
 use std::{error::Error, fmt};
@@ -64,28 +64,88 @@ impl Stream {
             length,
             config: config.config(),
             stream: match config.sample_format() {
+                cpal::SampleFormat::I8 => device.build_output_stream(
+                    &config.config(),
+                    move |data: &mut [i8], _: &cpal::OutputCallbackInfo| {
+                        Self::audio_callback::<i8>(channels, data, &mut vm)
+                    },
+                    err_fn,
+                    None,
+                )?,
                 cpal::SampleFormat::I16 => device.build_output_stream(
                     &config.config(),
                     move |data: &mut [i16], _: &cpal::OutputCallbackInfo| {
                         Self::audio_callback::<i16>(channels, data, &mut vm)
                     },
                     err_fn,
-                ),
+                    None,
+                )?,
+                cpal::SampleFormat::I32 => device.build_output_stream(
+                    &config.config(),
+                    move |data: &mut [i32], _: &cpal::OutputCallbackInfo| {
+                        Self::audio_callback::<i32>(channels, data, &mut vm)
+                    },
+                    err_fn,
+                    None,
+                )?,
+                cpal::SampleFormat::I64 => device.build_output_stream(
+                    &config.config(),
+                    move |data: &mut [i64], _: &cpal::OutputCallbackInfo| {
+                        Self::audio_callback::<i64>(channels, data, &mut vm)
+                    },
+                    err_fn,
+                    None,
+                )?,
+                cpal::SampleFormat::U8 => device.build_output_stream(
+                    &config.config(),
+                    move |data: &mut [u8], _: &cpal::OutputCallbackInfo| {
+                        Self::audio_callback::<u8>(channels, data, &mut vm)
+                    },
+                    err_fn,
+                    None,
+                )?,
                 cpal::SampleFormat::U16 => device.build_output_stream(
                     &config.config(),
                     move |data: &mut [u16], _: &cpal::OutputCallbackInfo| {
                         Self::audio_callback::<u16>(channels, data, &mut vm)
                     },
                     err_fn,
-                ),
+                    None,
+                )?,
+                cpal::SampleFormat::U32 => device.build_output_stream(
+                    &config.config(),
+                    move |data: &mut [u32], _: &cpal::OutputCallbackInfo| {
+                        Self::audio_callback::<u32>(channels, data, &mut vm)
+                    },
+                    err_fn,
+                    None,
+                )?,
+                cpal::SampleFormat::U64 => device.build_output_stream(
+                    &config.config(),
+                    move |data: &mut [u64], _: &cpal::OutputCallbackInfo| {
+                        Self::audio_callback::<u64>(channels, data, &mut vm)
+                    },
+                    err_fn,
+                    None,
+                )?,
                 cpal::SampleFormat::F32 => device.build_output_stream(
                     &config.config(),
                     move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                         Self::audio_callback::<f32>(channels, data, &mut vm)
                     },
                     err_fn,
-                ),
-            }?,
+                    None,
+                )?,
+                cpal::SampleFormat::F64 => device.build_output_stream(
+                    &config.config(),
+                    move |data: &mut [f64], _: &cpal::OutputCallbackInfo| {
+                        Self::audio_callback::<f64>(channels, data, &mut vm)
+                    },
+                    err_fn,
+                    None,
+                )?,
+                _ => unreachable!(),
+            },
         })
     }
 
@@ -115,13 +175,13 @@ impl Stream {
 
     fn audio_callback<T>(channels: usize, data: &mut [T], vm: &mut VM)
     where
-        T: Sample,
+        T: FromSample<f32> + Sample,
     {
         let buffer = vm.get_next_buffer(channels, data.len() / channels);
 
         for (sample_index, frame) in data.chunks_mut(channels).enumerate() {
             for (channel_index, sample) in frame.iter_mut().enumerate() {
-                *sample = Sample::from(&buffer.get_sample(channel_index, sample_index));
+                *sample = Sample::from_sample(buffer.get_sample(channel_index, sample_index));
             }
         }
     }

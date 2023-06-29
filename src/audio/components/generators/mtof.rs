@@ -5,7 +5,7 @@ use crate::runtime::value::Value;
 use super::generator::Generator;
 
 #[derive(Clone)]
-pub struct Mtof {}
+pub struct Mtof;
 
 impl Component for Mtof {
     fn arg_count(&self) -> usize {

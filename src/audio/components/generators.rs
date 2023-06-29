@@ -5,4 +5,4 @@ pub mod mtof;
 pub mod noise;
 pub mod oscil;
 pub mod padsr;
-pub mod wav_player;
+pub mod sample;

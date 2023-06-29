@@ -7,8 +7,12 @@ edition = "2021"
 
 [dependencies]
 colored = "2.0.0"
-cpal = "0.14.2"
+cpal = "0.15.2"
 dyn-clone = "1.0.10"
-hound = "3.5.0"
+ndarray = "0.15.6"
 phf = { version = "0.11", features = ["macros"] }
 rand = "0.8.5"
+
+[dependencies.sndfile]
+version = "0.1"
+features = ["ndarray_features"]
