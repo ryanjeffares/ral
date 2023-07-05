@@ -1,3 +1,7 @@
 fn main() {
-    println!("cargo:rustc-link-search=./libs");
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    println!("cargo:rustc-link-search=./libs/linux-x64");
+
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+    println!("cargo:rustc-link-search=./libs/win-x64");
 }
