@@ -1,7 +1,7 @@
 instruments {
     WavPlayer {
         perf {
-            local left, right: Audio = WavPlayer("C:/Users/ryand/Downloads/Suspirium1.wav");
+            local left, right: Audio = WavPlayer("C:/Users/ryand/Downloads/Suspirium1 mono.mp3");
             output(left, right);
         }
     }

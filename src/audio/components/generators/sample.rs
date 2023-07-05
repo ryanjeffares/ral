@@ -44,23 +44,29 @@ impl Component for Sample {
 
         if !sample_lookup.contains_key(sample_path) {
             // new sample, load it in
-            let mut snd = OpenOptions::ReadOnly(ReadOptions::Auto)
-                .from_path(sample_path)
-                .unwrap();
-            let samples: Vec<f32> = match snd.read_all_to_vec() {
-                Ok(samples) => samples,
-                Err(err) => {
-                    eprintln!("Failed to load {}: {:?}", sample_path, err);
-                    vec![]
+            match OpenOptions::ReadOnly(ReadOptions::Auto).from_path(sample_path) {
+                Ok(mut snd) => {
+                    let samples: Vec<f32> = match snd.read_all_to_vec() {
+                        Ok(samples) => samples,
+                        Err(err) => {
+                            eprintln!("Failed to load {}: {:?}", sample_path, err);
+                            vec![]
+                        }
+                    };
+        
+                    println!("Opened file {sample_path}, read {} samples", samples.len());
+                    sample_lookup.insert(sample_path.clone(), (snd.get_channels(), samples));
                 }
-            };
-
-            println!("Opened file {sample_path}, read {} samples", samples.len());
-            sample_lookup.insert(sample_path.clone(), (snd.get_channels(), samples));
+                Err(err) => {
+                    eprintln!("Failed to open file {sample_path}: {:?}", err);
+                    return vec![Value::audio(SharedAudioBuffer::new(1, stream_info.buffer_size))];
+                }
+            }
         }
 
         let (channels, samples) = sample_lookup.get(sample_path).unwrap();
-        let mut output = vec![Value::audio(SharedAudioBuffer::new(1, stream_info.buffer_size)); *channels];
+        let mut output =
+            vec![Value::audio(SharedAudioBuffer::new(1, stream_info.buffer_size)); *channels];
 
         // this handles interleaved??
         'outer: for sample in 0..stream_info.buffer_size {
@@ -69,7 +75,9 @@ impl Component for Sample {
                     break 'outer;
                 }
 
-                output[channel].get_audio_mut().add_sample(0, sample, samples[self.index]);
+                output[channel]
+                    .get_audio_mut()
+                    .add_sample(0, sample, samples[self.index]);
                 self.index += 1;
             }
         }
