@@ -15,7 +15,7 @@ pub enum ComponentType {
 pub trait Component: DynClone {
     fn arg_count(&self) -> usize;
     fn component_type(&self) -> ComponentType;
-    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value;
+    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Vec<Value>;
 }
 
 clone_trait_object!(Component);

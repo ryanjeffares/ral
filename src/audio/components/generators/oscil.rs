@@ -34,7 +34,7 @@ impl Component for Oscil {
         ComponentType::Generator
     }
 
-    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value {
+    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Vec<Value> {
         let mut buffer = SharedAudioBuffer::new(1, stream_info.buffer_size);
 
         let amps = args[0].get_float();
@@ -43,7 +43,7 @@ impl Component for Oscil {
             Ok(s) => s,
             Err(_) => {
                 eprintln!("No oscil shape for integer {}", args[2].get_int());
-                return Value::audio(buffer);
+                return vec![Value::audio(buffer)];
             }
         };
 
@@ -94,7 +94,7 @@ impl Component for Oscil {
             buffer.set_sample(0, sample, value * amps);
         }
 
-        Value::audio(buffer)
+        vec![Value::audio(buffer)]
     }
 }
 

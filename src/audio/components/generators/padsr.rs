@@ -28,7 +28,7 @@ impl Component for Padsr {
         ComponentType::Generator
     }
 
-    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value {
+    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Vec<Value> {
         let mut buffer = SharedAudioBuffer::new(1, stream_info.buffer_size);
 
         let attack = args[0].get_float() * stream_info.sample_rate as f32;
@@ -68,7 +68,7 @@ impl Component for Padsr {
             self.sample_clock += 1.0;
         }
 
-        Value::audio(buffer)
+        vec![Value::audio(buffer)]
     }
 }
 

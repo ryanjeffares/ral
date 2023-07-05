@@ -59,7 +59,7 @@ impl AudioBuffer {
     pub fn add_sample(&mut self, channel: usize, sample: usize, value: f32) {
         self.data[channel][sample] += value;
     }
-
+    
     pub fn add_from(&mut self, source: &AudioBuffer) {
         assert!(self.buffer_size == source.buffer_size);
 

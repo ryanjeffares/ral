@@ -16,9 +16,9 @@ impl Component for Mtof {
         ComponentType::Generator
     }
 
-    fn process(&mut self, _: &StreamInfo, args: Vec<Value>) -> Value {
+    fn process(&mut self, _: &StreamInfo, args: Vec<Value>) -> Vec<Value> {
         let midi = args[0].get_int() as f32;
-        Value::float(2.0f32.powf((midi - 69.0) / 12.0) * 440.0)
+        vec![Value::float(2.0f32.powf((midi - 69.0) / 12.0) * 440.0)]
     }
 }
 

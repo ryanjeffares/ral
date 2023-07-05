@@ -1,13 +1,18 @@
+use core::num;
 use std::fmt;
+
+use colored::Colorize;
 
 use crate::{
     audio::{
         audio_buffer::AudioBuffer,
-        components::component::{Component, ComponentType, StreamInfo},
+        components::component::{Component, ComponentType, StreamInfo}, shared_audio_buffer::SharedAudioBuffer,
     },
     runtime::ops::Op,
     runtime::value::Value,
 };
+
+use super::value::ValueType;
 
 #[derive(Clone)]
 struct Function {
@@ -351,13 +356,38 @@ impl InstrumentEventInstance {
 
                     match component_type {
                         ComponentType::Generator => {
-                            stack.push(func.components[*index].process(stream_info, args));
+                            let output = func.components[*index].process(stream_info, args);
+                            for buffer in output {
+                                stack.push(buffer);
+                            }
                         }
                     }
                 }
-                Op::DeclareLocal => {
-                    let value = stack.pop().unwrap();
-                    locals.push(value);
+                Op::DeclareLocal(num_locals) => {
+                    if stack.len() < *num_locals {
+                        eprintln!("WARNING: trying to assign to {num_locals} locals but only {} values output by expression, ignoring excess locals", stack.len());
+
+                    } else if *num_locals < stack.len() {
+                        eprintln!("WARNING: trying to assign to {num_locals} locals but {} values output by expression, ignoring excess values", stack.len());
+                    }
+                    
+                    // there will definitely be 1 thing on the stack
+                    // need to know its type in case we need to fill excess values
+                    let value_type = stack[0].value_type();
+                    for i in 0..*num_locals {
+                        if i < stack.len() {
+                            locals.push(stack[i].clone());
+                        } else {
+                            locals.push(match value_type {
+                                ValueType::Audio => Value::audio(SharedAudioBuffer::new(1, buffer_to_fill.buffer_size())),
+                                ValueType::Int => Value::int(0),
+                                ValueType::Float => Value::float(0.0),
+                                ValueType::String => Value::string("".to_string()),
+                            });
+                        }
+                    }
+                    
+                    stack.clear();
                 }
                 Op::LoadArg(index) => {
                     stack.push(args[*index].clone());
@@ -371,21 +401,15 @@ impl InstrumentEventInstance {
                 Op::LoadMember(index) => {
                     stack.push(self.variables[*index].clone());
                 }
-                Op::Output => {
-                    let right = stack.pop().unwrap();
-                    let right = right.get_audio();
-                    let left = stack.pop().unwrap();
-                    let left = left.get_audio();
+                Op::Output => {                    
+                    for (channel, buffer) in stack.iter().enumerate() {
+                        if channel >= buffer_to_fill.channels() {
+                            eprintln!("WARNING: excess outputs ignored");
+                            break;
+                        }
 
-                    self.max_amps = self.max_amps.max(left.max()).max(right.max());
-                    
-                    for channel in 0..buffer_to_fill.channels() {
                         for sample in 0..buffer_to_fill.buffer_size() {
-                            buffer_to_fill.add_sample(channel, sample, match channel {
-                                0 => left.get_sample(0, sample),
-                                1 => right.get_sample(0, sample),
-                                _ => unreachable!()
-                            })
+                            buffer_to_fill.add_sample(channel, sample, buffer.get_audio().get_sample(0, sample));
                         }
                     }
                 }

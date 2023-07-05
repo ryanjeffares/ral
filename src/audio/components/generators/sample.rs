@@ -36,7 +36,7 @@ impl Component for Sample {
         ComponentType::Generator
     }
 
-    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value {
+    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Vec<Value> {
         let sample_path = args[0].get_string();
 
         let mut sample_lookup = SAMPLE_LOOKUP.lock().unwrap();
@@ -60,31 +60,21 @@ impl Component for Sample {
         }
 
         let (channels, samples) = sample_lookup.get(sample_path).unwrap();
-        let mut output = SharedAudioBuffer::new(1, stream_info.buffer_size);
+        let mut output = vec![Value::audio(SharedAudioBuffer::new(1, stream_info.buffer_size)); *channels];
 
-        if *channels == 1 {
-            for sample in 0..stream_info.buffer_size {
+        // this handles interleaved??
+        'outer: for sample in 0..stream_info.buffer_size {
+            for channel in 0..*channels {
                 if self.index >= samples.len() {
-                    break;
+                    break 'outer;
                 }
 
-                output.set_sample(0, sample, samples[self.index]);
+                output[channel].get_audio_mut().add_sample(0, sample, samples[self.index]);
                 self.index += 1;
-            }
-        } else {
-            'outer: for sample in 0..stream_info.buffer_size {
-                for _ in 0..*channels {
-                    if self.index >= samples.len() {
-                        break 'outer;
-                    }
-
-                    output.add_sample(0, sample, samples[self.index]);
-                    self.index += 1;
-                }
             }
         }
 
-        Value::audio(output)
+        output
     }
 }
 

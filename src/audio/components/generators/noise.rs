@@ -29,7 +29,7 @@ impl Component for Noise {
         ComponentType::Generator
     }
 
-    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value {
+    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Vec<Value> {
         let mut buffer = SharedAudioBuffer::new(1, stream_info.buffer_size);
 
         for sample in 0..stream_info.buffer_size {
@@ -37,7 +37,7 @@ impl Component for Noise {
             buffer.set_sample(0, sample, value);
         }
 
-        Value::audio(buffer)
+        vec![Value::audio(buffer)]
     }
 }
 

@@ -3,6 +3,8 @@
 Experimental audio language in its very early stages.
 
 ## TODO
-* Convert audio to float and float to audio
+* Convert audio to numbers and numbers to audio
 * Handle setting desired num channels/sample rate etc.
-* Multiple locals declaration issue
+* Good way of reporting errors during perf
+  * Avoid printing the same message on every perf call
+* Resampling audio files in sampler

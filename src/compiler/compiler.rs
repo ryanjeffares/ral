@@ -377,14 +377,14 @@ impl Compiler {
 
         self.advance(); // consume type token
         self.consume(TokenType::Equal, "Expected '='");
-        // todo: need a way of checking in the run time if the amount of values produced by the expression matches the amount of locals declared
+        
         if let Some(expression_type) = self.expression(instrument) {
             if expression_type != type_token.to_variable_type() {
                 self.error_at_previous(format!("Type mismatch: expected '{:?}' for assignment to locals {:?} but got '{expression_type:?}'", type_token.to_variable_type(), local_name_tokens.iter().map(|token| token.text()).collect::<Vec<&String>>()));
                 return;
             }
 
-            self.emit_op(instrument, Op::DeclareLocal);
+            self.emit_op(instrument, Op::DeclareLocal(local_name_tokens.len()));
             self.consume(TokenType::Semicolon, "Expected ';'");
         }
     }
@@ -410,31 +410,26 @@ impl Compiler {
             }
         } else if self.match_token(TokenType::Output) {
             self.consume(TokenType::ParenOpen, "Expected '('");
-            if let Some(expression_type) = self.expression(instrument) {
+
+            while let Some(expression_type) = self.expression(instrument) {
                 if expression_type != VariableType::Audio {
                     self.error_at_previous(format!(
                         "Expected Audio for 'output' but got {expression_type:?}"
                     ));
                     return;
                 }
-            } else {
-                return;
-            }
 
-            self.consume(TokenType::Comma, "Expected ','");
+                if self.match_token(TokenType::ParenClose) {
+                    break;
+                }
 
-            if let Some(expression_type) = self.expression(instrument) {
-                if expression_type != VariableType::Audio {
-                    self.error_at_previous(format!(
-                        "Expected Audio for 'output' but got {expression_type:?}"
-                    ));
+                if !self.match_token(TokenType::Comma) {
+                    self.error_at_current("Expected ','".to_string());
                     return;
                 }
-                self.emit_op(instrument, Op::Output);
-                self.consume(TokenType::ParenClose, "Expected ')'");
-            } else {
-                return;
             }
+
+            self.emit_op(instrument, Op::Output);
         } else if self.match_token(TokenType::Identifier) {
             self.assignment_statement(instrument);
         } else {

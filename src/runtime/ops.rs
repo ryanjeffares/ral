@@ -6,7 +6,7 @@ pub enum Op {
     AssignLocal(usize),
     AssignMember(usize),
     CallComponent(usize),
-    DeclareLocal,
+    DeclareLocal(usize),
     Divide,
     LoadArg(usize),
     LoadConstant(Value),

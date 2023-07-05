@@ -25,7 +25,7 @@ impl Component for Adsr {
         ComponentType::Generator
     }
 
-    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Value {
+    fn process(&mut self, stream_info: &StreamInfo, args: Vec<Value>) -> Vec<Value> {
         let output;
 
         let attack = args[0].get_float() * stream_info.sample_rate as f32;
@@ -58,7 +58,7 @@ impl Component for Adsr {
         }
 
         self.sample_clock += stream_info.buffer_size as f32;
-        Value::float(output)
+        vec![Value::float(output)]
     }
 }
 
