@@ -1,0 +1,2 @@
+Hello, World!
+Compilation: finished in 316.458µs

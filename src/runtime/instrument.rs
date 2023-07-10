@@ -152,17 +152,17 @@ impl Instrument {
     }
 
     pub fn print_ops(&self) {
+        fn print_ops_inner(ops: &Vec<Op>) {
+            for op in ops {
+                println!("\t\t{op:?}");
+            }
+        }
+
         println!("{}:", self.instrument_name);
         println!("\tinit:");
-
-        for op in &self.init_func.ops {
-            println!("\t\t{op:?}");
-        }
-
+        print_ops_inner(&self.init_func.ops);
         println!("\tperf:");
-        for op in &self.perf_func.ops {
-            println!("\t\t{op:?}");
-        }
+        print_ops_inner(&self.perf_func.ops);
     }
 
     pub fn num_init_args(&self) -> usize {

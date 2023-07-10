@@ -126,7 +126,6 @@ impl Compiler {
     fn advance(&mut self) {
         self.previous = self.current.clone();
         self.current = Some(self.scanner.scan_token());
-        // println!("{}", self.current.as_ref().unwrap());
     }
 
     fn match_token(&mut self, expected: TokenType) -> bool {
@@ -655,7 +654,6 @@ impl Compiler {
             i += 1;
         }
 
-        println!("{res}");
         Ok(res)
     }
 
@@ -682,7 +680,8 @@ impl Compiler {
 
                     if let Some(expression_type) = self.expression(instrument) {
                         if expression_type != info.input_types[arg_count] {
-                            self.error_at_previous(format!("Expected {:?} for input at position {arg_count} for {ident_text} but got {expression_type:?}", info.input_types[arg_count]));
+                            self.error_at_previous(format!("Expected {:?} for input at position {arg_count} 
+                            for {ident_text} but got {expression_type:?}", info.input_types[arg_count]));
                             return None;
                         }
 
@@ -1034,13 +1033,22 @@ impl Compiler {
             token.column()
         );
         eprintln!("        |");
+
+        if token.line() > 0 {
+            eprintln!(
+                "{:7} | {}",
+                token.line() - 1,
+                self.scanner.get_code_at_line(token.line() - 1)
+            );
+        }
+
         eprintln!(
             "{:7} | {}",
             token.line(),
             self.scanner.get_code_at_line(token.line())
         );
-        eprint!("        | ");
 
+        eprint!("        | ");
         for _ in 0..token.column() - 1 {
             eprint!(" ");
         }
@@ -1049,6 +1057,15 @@ impl Compiler {
             eprint!("{}", "^".red());
         }
 
+        if token.line() < self.scanner.get_num_lines() {
+            eprintln!(
+                "\n{:7} | {}",
+                token.line() + 1,
+                self.scanner.get_code_at_line(token.line() + 1)
+            );
+        }
+
+        eprint!("        | ");
         eprintln!();
     }
 }

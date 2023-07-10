@@ -1,12 +1,14 @@
 instruments {
     WavPlayer {
-        perf {
-            local left, right: Audio = WavPlayer("C:/Users/ryand/Downloads/Suspirium1 mono.mp3");
+        perf(sample: String) {
+            local left, right: Audio = WavPlayer(sample);
             output(left, right);
         }
     }
 }
 
 score {
-    WavPlayer(0.0 10.0);
+    WavPlayer(0.0 0.5 perf("/Users/ryanjeffares/Documents/APTalkSamples/Clap.wav"));
+    WavPlayer(0.5 0.5 perf("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+    WavPlayer(1.0 0.5 perf("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
 }

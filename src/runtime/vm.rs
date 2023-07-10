@@ -216,6 +216,7 @@ impl VM {
         match output_target {
             OutputTarget::Dac => {
                 let stream = audio::stream::Stream::new(self)?;
+                println!("Opened stream, Sample Rate: {}", stream.sample_rate());
                 stream.play()?;
 
                 // TODO: hacky way to make sure init calls still happen on 0 length scores
@@ -305,7 +306,7 @@ impl VM {
 
         // println!("Max amplitude of buffer: {}", buffer_to_fill.max());
         let time = timer.elapsed();
-        // println!("{time:?}");
+        // println!("Perf completed in {time:?}");
         self.max_perf_time = self.max_perf_time.max(time);
         self.total_perf_time += time;
         self.perf_count += 1;

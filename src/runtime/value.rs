@@ -1,15 +1,12 @@
 use std::{
     fmt,
-    mem::ManuallyDrop,
+    mem::{ManuallyDrop, size_of},
     ops::{Add, Div, Mul, Sub},
 };
 
 use crate::audio::shared_audio_buffer::SharedAudioBuffer;
 
-pub struct Value {
-    value_type: ValueType,
-    value: Data,
-}
+const SIZE: usize = size_of::<Value>();
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ValueType {
@@ -24,6 +21,11 @@ union Data {
     float: f32,
     string: ManuallyDrop<Box<String>>,
     audio: ManuallyDrop<SharedAudioBuffer>,
+}
+
+pub struct Value {
+    value_type: ValueType,
+    value: Data,
 }
 
 impl Value {
@@ -100,7 +102,6 @@ impl PartialEq for Value {
         }
     }
 }
-
 impl Mul for Value {
     type Output = Value;
     // TODO: allow different types - audio * float, string * int etc...
@@ -136,7 +137,6 @@ impl Mul for Value {
         }
     }
 }
-
 impl Div for Value {
     type Output = Value;
     fn div(self, rhs: Self) -> Self::Output {
@@ -162,7 +162,6 @@ impl Div for Value {
         }
     }
 }
-
 impl Add for Value {
     type Output = Value;
     fn add(self, rhs: Self) -> Self::Output {
@@ -197,7 +196,6 @@ impl Add for Value {
         }
     }
 }
-
 impl Sub for Value {
     type Output = Value;
     fn sub(self, rhs: Self) -> Self::Output {

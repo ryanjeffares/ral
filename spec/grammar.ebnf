@@ -1,21 +1,21 @@
 (* Top Level *)
-program = [ settingsDeclaration ], [ instrumentsDeclaration ], [ scoreDeclaration ] EOF ;
-instrumentsDeclaration = "instruments", "{", [ { instrument } ], "}", ;
-scoreDeclaration = "score", "{", [ { scoreEvent } ] ;
+program = [ instrumentsDeclaration ], [ scoreDeclaration ] EOF ;
+instrumentsDeclaration = "instruments", "{", [ { instrument } ], "}" ;
+scoreDeclaration = "score", "{", [ { scoreEvent } ], "}" ;
 
 (* Instruments *)
-instrument = IDENTIFIER, "{", [ { memberVarDeclaration } ], [ initFunc ], [ perfFunc ] "}" ;
+instrument = IDENTIFIER, "{", [ { memberVarDeclaration } ], [ initFunc ], [ perfFunc ], "}" ;
 memberVarDeclaration = IDENTIFIER, ":", TYPE, ";" ;
-initFunc = "init", [ "(", [ { IDENTIFIER, ":", TYPE - "Audio" } ], ")" ], "{", [ { localDeclaration | statement - outputStatement } ], "}" ;
-perfFunc = "init", [ "(", [ { IDENTIFIER, ":", TYPE - "Audio" } ], ")" ], "{", [ { localDeclaration | statement } ], "}" ;
+initFunc = "init", [ "(", [ IDENTIFIER, ":", TYPE - "Audio", [ ",", { IDENTIFIER, ":", TYPE - "Audio" } ] ], ")" ], "{", [ { localDeclaration | statement - outputStatement } ], "}" ;
+perfFunc = "perf", [ "(", [ IDENTIFIER, ":", TYPE - "Audio", [ ",", { IDENTIFIER, ":", TYPE - "Audio" } ] ], ")" ], "{", [ { localDeclaration | statement } ], "}" ;
 
-localDeclaration = "local", IDENTIFIER, ":", TYPE, "=", expression ";" ;
+localDeclaration = "local", IDENTIFIER, [ { ",", IDENTIFIER } ] ":", TYPE, "=", expression ";" ;
 
 statement = printStatement | printLnStatement | outputStatement | assignmentStatement ;
 
 printStatement = "print", "(", expression, ")", ";" ;
 printLnStatement = "println", "(", expression, ")", ";" ;
-outputStatement = "output", "(", expression, ")", ";" ;
+outputStatement = "output", "(", expression, { ",", expression }, ")", ";" ;
 assignmentStatement = IDENTIFIER "=" expression ";" ;
 
 (* TODO: logical/bitwise/unary expression types *)
@@ -23,11 +23,11 @@ expression = term ;
 term = factor [ { ("-" | "+") factor } ] ;
 factor = call [ { ("/" | "*") call } ] ;
 call = componentCall | primary ;
-componentCall = COMPONENT_NAME "(", [ { expression } ], ")", ";" ;
+componentCall = COMPONENT_NAME "(", [ expression [ { ",", expression } ] ], ")", ";" ;
 primary = INT | FLOAT | STRING | IDENTIFIER | "(", expression, ")" ;
 
 (* Score *)
-scoreEvent = IDENTIFIER, "(", [ { LITERAL } ], ")", ";" ;
+scoreEvent = IDENTIFIER, "(", FLOAT, FLOAT, [ "init", "(", [ { expression} ], ")" ], [ "perf", "(", [ { expression } ], ")" ], ")", ";" ;
 
 (* Lexemes *)
 ALPHA = "a" ... "z" | "A" ... "Z" | "_" ;
@@ -37,3 +37,5 @@ INT = { DIGIT } ;
 FLOAT = { DIGIT }, ".", { DIGIT } ;
 STRING = '"', { any char }, '"' ;
 TYPE = "Int" | "Float" | "String" | "Audio" ;
+
+

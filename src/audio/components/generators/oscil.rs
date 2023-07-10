@@ -19,6 +19,11 @@ pub struct Oscil {
     phase: f32,
 }
 
+impl Generator<3> for Oscil {
+    const INPUT_TYPES: [VariableType; 3] = [VariableType::Float, VariableType::Float, VariableType::Int];
+    const OUTPUT_TYPE: VariableType = VariableType::Audio;
+}
+
 impl Oscil {
     pub fn new() -> Self {
         Oscil { phase: 0.0 }
@@ -96,12 +101,6 @@ impl Component for Oscil {
 
         vec![Value::audio(buffer)]
     }
-}
-
-impl Generator<3> for Oscil {
-    const INPUT_TYPES: [VariableType; 3] =
-        [VariableType::Float, VariableType::Float, VariableType::Int];
-    const OUTPUT_TYPE: VariableType = VariableType::Audio;
 }
 
 pub enum ShapeError {

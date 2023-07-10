@@ -1,0 +1,138 @@
+instruments {
+  Bass {
+    freq: Float;
+
+    init(note: Int) {
+      freq = Mtof(note - 12);
+    }
+
+    perf(time: Float) {
+      local env: Audio = Padsr(0.01, 0.0, 1.0, 0.01, time);
+      local audio: Audio = Oscil(0.5, freq, 0) * env * 1.25;
+      output(audio, audio);
+    }
+  }
+
+  Drums {
+    samplePath: String;
+
+    init(path: String) {
+      samplePath = path;
+    }
+
+    perf {
+      local left, right: Audio = WavPlayer(samplePath);
+      output(left * 0.5, right * 0.5);
+    }
+  }
+
+  Lead {
+    freq: Float;
+
+    init(note: Int) {
+      freq = Mtof(note - 12);
+    }
+
+    perf(time: Float) {
+      local env: Audio = Padsr(0.0, 0.0, 0.5, time, time);
+      local audio: Audio = Oscil(0.5, freq, 2) * env * 0.35;
+      output(audio, audio);
+    }
+  }
+}
+
+score {
+  Drums(0.0 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(0.25 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(0.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(0.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Clap.wav"));
+  Drums(0.75 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(1.0 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(1.25 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(1.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(1.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Clap.wav"));
+  Drums(1.75 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+
+  Drums(2.0 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(2.25 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(2.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(2.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Clap.wav"));
+  Drums(2.75 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(3.0 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(3.25 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(3.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(3.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Clap.wav"));
+  Drums(3.75 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+
+  Drums(4.0 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(4.25 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(4.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(4.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Clap.wav"));
+  Drums(4.75 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(5.0 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(5.25 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(5.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(5.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Clap.wav"));
+  Drums(5.75 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+
+  Drums(6.0 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(6.25 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(6.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(6.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Clap.wav"));
+  Drums(6.75 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(7.0 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(7.25 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+  Drums(7.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Kick.wav"));
+  Drums(7.5 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Clap.wav"));
+  Drums(7.75 0.5 init("/Users/ryanjeffares/Documents/APTalkSamples/Hats.wav"));
+
+  Bass(0.0 0.25 init(45) perf(0.25));
+  Bass(0.5 0.25 init(45) perf(0.25));
+  Bass(1.0 0.25 init(45) perf(0.25));
+  Bass(1.5 0.25 init(45) perf(0.25));
+  Bass(1.75 0.125 init(47) perf(0.125));
+  Bass(1.875 0.275 init(48) perf(0.275));
+
+  Bass(2.5 0.25 init(48) perf(0.25));
+  Bass(3.0 0.25 init(48) perf(0.25));
+  Bass(3.5 0.25 init(48) perf(0.25));
+  Bass(3.75 0.125 init(50) perf(0.125));
+  Bass(3.875 0.275 init(52) perf(0.275));
+
+  Bass(4.5 0.25 init(52) perf(0.25));
+  Bass(5.0 0.25 init(52) perf(0.25));
+  Bass(5.5 0.25 init(52) perf(0.25));
+
+  Bass(6.0 0.25 init(54) perf(0.25));
+  Bass(6.25 0.25 init(52) perf(0.25));
+  Bass(6.5 0.25 init(50) perf(0.25));
+  Bass(6.75 0.25 init(48) perf(0.25));
+  Bass(7.0 0.25 init(47) perf(0.25));
+  Bass(7.25 0.25 init(45) perf(0.25));
+  Bass(7.5 0.25 init(43) perf(0.25));
+  Bass(7.75 0.25 init(42) perf(0.25));
+
+  Lead(1.75 0.125 init(74) perf(0.125));
+  Lead(1.875 0.125 init(76) perf(0.125));
+
+  Lead(2.25 0.125 init(84) perf(0.125));
+  Lead(2.75 0.25 init(81) perf(0.25));
+  Lead(3.0 0.25 init(79) perf(0.25));
+  Lead(3.25 0.25 init(79) perf(0.25));
+  Lead(3.5 0.25 init(79) perf(0.25));
+  Lead(3.75 0.125 init(81) perf(0.125));
+  Lead(3.875 0.125 init(83) perf(0.125));
+
+  Lead(5.75 0.125 init(76) perf(0.125));
+  Lead(5.875 0.125 init(76) perf(0.125));
+
+  Lead(6.0 0.25 init(88) perf(0.25));
+  Lead(6.25 0.25 init(86) perf(0.25));
+  Lead(6.5 0.25 init(83) perf(0.25));
+  Lead(6.75 0.25 init(81) perf(0.25));
+  Lead(7.0 0.25 init(79) perf(0.25));
+  Lead(7.25 0.25 init(79) perf(0.25));
+  Lead(7.5 0.25 init(79) perf(0.25));
+  Lead(7.75 0.125 init(81) perf(0.125));
+  Lead(7.875 0.125 init(76) perf(0.125));
+}

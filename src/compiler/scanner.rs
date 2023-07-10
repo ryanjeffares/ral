@@ -193,6 +193,25 @@ impl Scanner {
         slice.to_string()
     }
 
+    pub fn get_num_lines(&self) -> usize {
+        let bytes = self.code.as_bytes();
+        let mut curr = 0;
+        let mut count = 1;
+
+        loop {
+            if curr >= bytes.len() {
+                break;
+            }
+
+            curr += 1;
+            if bytes[curr - 1] == b'\n' {
+                count += 1;
+            }
+        }
+        
+        count
+    }
+
     pub fn scan_token(&mut self) -> Token {
         self.skip_whitespace();
         self.start = self.current;
