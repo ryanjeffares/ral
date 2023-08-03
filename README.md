@@ -8,3 +8,4 @@ Experimental audio language in its very early stages.
 * Good way of reporting errors during perf
   * Avoid printing the same message on every perf call
 * Resampling audio files in sampler
+* Tables
